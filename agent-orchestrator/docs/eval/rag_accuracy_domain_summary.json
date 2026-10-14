@@ -1,0 +1,15 @@
+{
+  "label": "领域题（真实准确率）",
+  "threshold": 0.6,
+  "total": 22,
+  "valid": 18,
+  "errors": 0,
+  "recall": 0.8666666666666667,
+  "avg_point_coverage": 0.6166666666666667,
+  "strict_acc": 0.4444444444444444,
+  "strict_pass": 8,
+  "avg_duration_s": 27.883333333333333,
+  "oob_total": 4,
+  "oob_rejected": 3,
+  "oob_hallucinated": 0
+}

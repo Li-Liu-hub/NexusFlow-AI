@@ -1,0 +1,464 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>终端 AI 智慧管理平台 · 项目展示</title>
+<meta name="description" content="运营商固网终端 AI 智慧管理平台：多智能体协作完成补货决策与跨仓调拨，确定性算法杜绝数字幻觉，Token 计量配额成本可控——自研 Agent 网关 + LangGraph 编排，公网可访问。">
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: #faf9ff; color: #26263a; overflow-x: hidden;
+         font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif; }
+  a { color: #6d5bd0; text-decoration: none; }
+  img { max-width: 100%; height: auto; display: block; }
+
+  /* ═══ 顶栏 ═══ */
+  .nav { position: sticky; top: 0; z-index: 99; background: rgba(255,255,255,.94); backdrop-filter: blur(10px);
+         border-bottom: 1px solid #e6e1f8; display: flex; align-items: center; height: 54px; padding: 0 28px; }
+  .nav .brand { font-weight: 800; color: #6d5bd0; font-size: 15px; margin-right: 28px; letter-spacing: .5px; white-space: nowrap; }
+  .nav .links { flex: 1; display: flex; }
+  .nav .links a { flex: 1; text-align: center; color: #1e293b; font-size: 13.5px; font-weight: 500; text-decoration: none;
+                  padding: 7px 0; margin: 0 6px; position: relative; white-space: nowrap; transition: color .15s; }
+  .nav .links a::after { content: ""; position: absolute; left: 50%; bottom: 0; width: 0; height: 2.5px;
+                         border-radius: 2px; background: #6d5bd0; transform: translateX(-50%); transition: width .2s; }
+  .nav .links a:hover { color: #6d5bd0; }
+  .nav .links a:hover::after { width: 55%; }
+  .nav .links a.on { color: #6d5bd0; font-weight: 700; }
+  .nav .links a.on::after { width: 55%; }
+
+  /* ═══ 项目入口白卡 ═══ */
+  .entry-row { display: flex; align-items: stretch; justify-content: center; gap: 28px; margin-top: 36px; flex-wrap: wrap;
+               scroll-margin-top: 74px; }
+  .entry-card { display: block; background: #fff; border-radius: 16px; padding: 22px 24px 18px; width: 320px;
+                text-align: left; text-decoration: none; box-shadow: 0 6px 22px rgba(30,20,80,.22);
+                transition: transform .18s, box-shadow .18s; }
+  .entry-card:hover { transform: translateY(-4px); box-shadow: 0 14px 30px rgba(30,20,80,.32); }
+  .entry-card .et { font-size: 16.5px; font-weight: 800; color: #1e293b; margin-bottom: 8px; }
+  .entry-card .ed { font-size: 12.5px; color: #55556b; line-height: 1.8; margin-bottom: 14px; }
+  .entry-card .go { display: flex; align-items: center; justify-content: space-between;
+                    font-size: 13px; font-weight: 700; color: #6d5bd0; }
+  .entry-card .go .arr { font-size: 15px; transition: transform .18s; }
+  .entry-card:hover .go .arr { transform: translateX(4px); }
+  .nav .sp { flex: 1; }
+
+  /* ═══ 通用 ═══ */
+  .wrap { max-width: 1140px; margin: 0 auto; padding: 0 28px; }
+  section { padding: 64px 0 40px; scroll-margin-top: 64px; }
+  .eyebrow { display: block; width: 100vw; margin-left: calc(50% - 50vw); margin-bottom: 14px;
+             background: #f4f0ff; color: #6d5bd0; text-align: center;
+             font-size: 18px; font-weight: 700; padding: 10px 0; }
+  h2 { font-size: 30px; margin: 0 0 12px; color: #1e293b; }
+  .sub { font-size: 14.5px; color: #55556b; line-height: 1.75; max-width: 820px; margin-bottom: 28px; }
+  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
+  .grid3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px; }
+  .grid4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; }
+  .card { background: #fff; border: 1.5px solid #e6e1f8; border-radius: 16px; padding: 24px;
+          box-shadow: 0 4px 20px rgba(109,91,208,.06); }
+  .card .t { font-size: 15px; font-weight: 700; margin-bottom: 8px; }
+  .card .d { font-size: 12.5px; line-height: 1.7; color: #55556b; }
+  .num-big { font-size: 34px; font-weight: 800; color: #6d5bd0; font-family: Consolas, Menlo, monospace; }
+  .num-k { font-size: 12px; color: #8b8ba3; margin-top: 2px; }
+
+  /* ═══ Hero ═══ */
+  .hero { background: linear-gradient(rgba(70,50,140,.82), rgba(90,70,160,.78)),
+                     url("hero_bg.jpg") center / cover no-repeat;
+          color: #1e293b; padding: 72px 0 56px; text-align: center; }
+  .hero h1 { font-size: 42px; font-weight: 800; margin: 0 0 12px; }
+  .hero .sub { color: rgba(255,255,255,.88); font-size: 17px; max-width: 720px; margin: 0 auto 36px; }
+  .hero .stats { display: flex; justify-content: center; gap: 40px; margin-top: 48px; flex-wrap: wrap; }
+  .hero .stat { text-align: center; }
+  .hero .stat .n { font-size: 36px; font-weight: 800; font-family: Consolas, monospace; }
+  .hero .stat .k { font-size: 12.5px; margin-top: 4px; }
+
+  /* ═══ 能力关键词胶囊 ═══ */
+  .cap-row { display: flex; justify-content: center; gap: 16px; margin-top: 40px; flex-wrap: wrap; }
+  .cap { display: inline-flex; align-items: center; gap: 9px; background: rgba(255,255,255,.82);
+         border: 1px solid rgba(109,91,208,.35); border-radius: 999px; padding: 9px 24px;
+         font-size: 13.5px; font-weight: 700; color: #55349c; }
+  .cap::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: #6d5bd0; }
+
+  /* ═══ Section head ═══ */
+  .sec-head { text-align: center; margin-bottom: 44px; }
+  .sec-head .tag { margin-bottom: 10px; display: inline-block; }
+  .sec-head h2 { font-size: 30px; }
+  .sec-head p { font-size: 14.5px; color: #64748b; max-width: 680px; margin: 10px auto 0; line-height: 1.7; }
+
+  /* ═══ 编号胶囊（痛点卡） ═══ */
+  .pill { display: inline-flex; align-items: center; justify-content: center;
+          width: 32px; height: 32px; border-radius: 10px; background: #6d5bd0; color: #fff;
+          font-size: 13px; font-weight: 700; font-family: Consolas, monospace; margin-bottom: 14px; }
+
+  /* ═══ 左色条卡 ═══ */
+  .barcard { background: #fff; border: 1.5px solid #e6e1f8; border-radius: 4px 16px 16px 4px;
+             padding: 20px 22px; border-left: 4px solid var(--accent, #6d5bd0); position: relative; }
+  .barcard .t { font-size: 14.5px; font-weight: 700; color: #1e293b; margin-bottom: 8px; }
+  .barcard .d { font-size: 12.5px; line-height: 1.7; color: #55556b; }
+
+  /* ═══ 步骤流 ═══ */
+  .steps { display: flex; gap: 0; align-items: stretch; margin: 28px 0; }
+  .step { flex: 1; text-align: center; position: relative; padding: 0 12px; }
+  .step:not(:last-child)::after { content: "→"; position: absolute; right: -10px; top: 50%;
+    transform: translateY(-50%); font-size: 20px; color: #c4b5fd; }
+  .step .sn { width: 40px; height: 40px; border-radius: 50%; background: #6d5bd0; color: #fff;
+              display: flex; align-items: center; justify-content: center; margin: 0 auto 10px;
+              font-weight: 700; font-size: 16px; }
+  .step .st { font-size: 14px; font-weight: 700; color: #1e293b; margin-bottom: 4px; }
+  .step .sd { font-size: 12px; color: #64748b; line-height: 1.6; }
+
+  /* ═══ 时间线 ═══ */
+  .tl { border-left: 3px solid #c4b5fd; margin-left: 16px; padding-left: 28px; }
+  .tl .ev { position: relative; padding-bottom: 24px; }
+  .tl .ev::before { content: ""; position: absolute; left: -34px; top: 4px; width: 10px; height: 10px;
+                    border-radius: 50%; background: #7c5cf0; border: 2.5px solid #fff;
+                    box-shadow: 0 0 0 2px #c4b5fd; }
+  .tl .ev .d { font-size: 11.5px; color: #8b8ba3; font-family: Consolas, monospace; }
+  .tl .ev .h { font-size: 14px; font-weight: 700; color: #1e293b; margin: 2px 0 4px; }
+  .tl .ev .b { font-size: 12.5px; line-height: 1.65; color: #55556b; }
+
+  /* ═══ 图表容器 ═══ */
+  .chart-box { background: #fff; border: 1.5px solid #e6e1f8; border-radius: 16px;
+               box-shadow: 0 4px 16px rgba(109,91,208,.06); }
+  .chart-box img { width: 100%; height: auto; }
+  .chart-box.slim { max-width: 640px; margin: 0 auto; }
+  .chart-cap { padding: 10px 18px 12px; text-align: center; font-size: 12px; color: #8b8ba3;
+               border-top: 1px solid #f0ecf9; line-height: 1.7; }
+
+  /* ═══ 模块佐证层：小标题 / 数据表 / 成效条 ═══ */
+  .blk-t { text-align: center; font-size: 13px; font-weight: 700; color: #6d5bd0;
+           letter-spacing: 1px; margin: 30px 0 14px; }
+  .tbl { background: #fff; border: 1.5px solid #e6e1f8; border-radius: 16px; overflow: hidden;
+         box-shadow: 0 4px 16px rgba(109,91,208,.06); }
+  .tbl table { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+  .tbl th { background: #f4f0ff; color: #4c3a9e; text-align: left; padding: 11px 16px; white-space: nowrap; }
+  .tbl td { padding: 11px 16px; border-top: 1px solid #efeaf9; color: #55556b; line-height: 1.7; }
+  .tbl td:first-child { color: #1e293b; font-weight: 600; white-space: nowrap; }
+  .effect { display: block; width: max-content; max-width: 100%; margin: 22px auto 0;
+            background: #f4f0ff; color: #55349c; font-size: 12.5px; font-weight: 600;
+            padding: 9px 22px; border-radius: 20px; text-align: center; }
+
+  @media (max-width: 900px) { .grid2, .grid3, .grid4 { grid-template-columns: 1fr; } .steps { flex-direction: column; }
+    .nav { padding: 0 10px; } .nav .brand { margin-right: 12px; font-size: 13px; }
+    .nav .links a { font-size: 12px; margin: 0 2px; } }
+</style>
+</head>
+<body>
+
+<!-- ═══ 顶栏 ═══ -->
+<nav class="nav">
+  <div class="brand">终端 AI 智慧管理平台</div>
+  <div class="links">
+    <a href="#pain">业务痛点</a>
+    <a href="#solution">解决方案</a>
+    <a href="#arch">总体架构</a>
+    <a href="#core">编排核心</a>
+    <a href="#report">报表生成</a>
+    <a href="#ops">零代码运维台</a>
+    <a href="#token">Token 治理</a>
+    <a href="#sec">安全</a>
+    <a href="#num">验收</a>
+  </div>
+</nav>
+
+<!-- ═══ Hero ═══ -->
+<section class="hero">
+  <div style="max-width: 900px; margin: 0 auto;">
+    <h1 style="font-size: 42px; font-weight: 800; margin: 0 0 14px; color: #1e293b; text-shadow: 0 0 26px rgba(255,255,255,.65), 0 0 10px rgba(255,255,255,.35);">终端 AI 智慧管理平台</h1>
+    <p style="font-size: 16px; color: #d9d2f6; max-width: 720px; margin: 0 auto 32px; line-height: 1.9;">
+      面向运营商省—市—县—网格四级仓储体系，把补货决策、跨仓调拨、知识问答搬进一次对话——
+      终端管理员描述需求，AI 自动完成取数、计算与清单生成，全程留痕可回溯。
+    </p>
+    <div class="cap-row">
+      <span class="cap">多智能体协作</span>
+      <span class="cap">计算零幻觉</span>
+      <span class="cap">Token 计量配额</span>
+    </div>
+    <div class="entry-row" id="entry">
+      <a class="entry-card" href="http://49.234.49.192/portal.html" target="_blank">
+        <div class="et">业务门户</div>
+        <div class="ed">终端管理业务的对话入口——和 AI 助手用自然语言协作，处理日常业务。</div>
+        <div class="go"><span>立即进入</span><span class="arr">→</span></div>
+      </a>
+      <a class="entry-card" href="http://49.234.49.192/admin/" target="_blank">
+        <div class="et">数字员工运维台</div>
+        <div class="ed">管理员的工作台：可视化配置数字员工的人设、技能与知识库，用量与调用全程可查。</div>
+        <div class="go"><span>立即进入</span><span class="arr">→</span></div>
+      </a>
+    </div>
+  </div>
+</section>
+
+<!-- ═══ 业务痛点 ═══ -->
+<section id="pain" style="padding: 56px 0 32px;">
+  <div class="wrap">
+    <div class="sec-head">
+      <div class="eyebrow">一、业务痛点</div>
+      <h2>人工运维的四个"靠"</h2>
+      <p>运营商固网终端（光猫、机顶盒、FTTR 等）按省—市—县—网格四级仓储管理，覆盖到智家工程师。
+       传统模式下面临四个问题：</p>
+    </div>
+    <div class="grid4">
+      <div class="feat"><div class="pill">01</div>
+        <div class="t">补货凭经验</div>
+        <div class="d">采购与补货靠个人经验判断，缺乏数据支撑，容易积压或缺货</div></div>
+      <div class="feat"><div class="pill">02</div>
+        <div class="t">调拨靠电话</div>
+        <div class="d">跨仓协调依赖线下电话沟通，对方仓有没有货、给多少，全靠反复确认</div></div>
+      <div class="feat"><div class="pill">03</div>
+        <div class="t">库存靠人工盘查</div>
+        <div class="d">缺货和长库龄积压靠人工盘查发现，发现时往往已经造成浪费</div></div>
+      <div class="feat"><div class="pill">04</div>
+        <div class="t">报表手工统计</div>
+        <div class="d">数据价值沉睡在表格里，管理层看不到终端管理的真实成效</div></div>
+    </div>
+    <div class="blk-t">人工方式 vs 平台方式</div>
+    <div class="tbl"><table>
+      <tr><th>环节</th><th>传统人工方式</th><th>平台化后</th></tr>
+      <tr><td>补货决策</td><td>凭个人经验判断，缺乏数据支撑，易积压或缺货</td><td>确定性算法按周使用量与缺口自动生成补货建议</td></tr>
+      <tr><td>跨仓调拨</td><td style="text-decoration: line-through;">电话反复确认对方库存与数量</td><td>AI统计各区域库存情况，自动生成调拨建议，解决库存不透明问题，平衡区域库存。</td></tr>
+      <tr><td>库存盘点</td><td>人工盘查，发现时往往已造成积压浪费</td><td>定时巡检超警戒线自动告警（10 分钟周期）</td></tr>
+      <tr><td>数据报表</td><td>手工统计，数据价值沉睡</td><td>报表自动生成，补货与调拨全链路留痕可回溯</td></tr>
+    </table></div>
+  </div>
+</section>
+
+<!-- ═══ 解决方案（业务流程图） ═══ -->
+<section id="solution" style="padding: 24px 0 48px;">
+  <div class="wrap">
+    <div class="sec-head">
+      <div class="eyebrow">二、解决方案</div>
+      <h2>从人工直觉到数据驱动</h2>
+      <p>基于自研 Agent 网关架构，编排多智能体工作流，对话完成补货决策与调拨全流程</p>
+    </div>
+    <div class="chart-box slim">
+      <a href="业务流程图.png" target="_blank"><img src="业务流程图.png" alt="补货建议与调拨闭环总体流程图"></a>
+      <div class="chart-cap">补货建议与调拨闭环：10 分钟巡检超警戒线自动触发，或账管对话直接发起——调拨优先消化长库龄、缺口转采购，账管确认后校验落库，全程留痕</div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══ 总体架构 ═══ -->
+<section id="arch" style="padding: 40px 0 48px; background: #f8f7fc;">
+  <div class="wrap">
+    <div class="sec-head">
+      <div class="eyebrow">三、总体架构</div>
+      <h2>六层架构 · 统一网关收口</h2>
+      <p>统一 AI 网关收口 REST API、AI 智能体、MCP 工具的鉴权、限流与 Token 计量；
+       能注册服务全部走服务发现；Python 编排层经网关签名回调 Java 智能体——跨语言协作、计量全收口</p>
+    </div>
+    <div class="chart-box">
+      <img src="项目架构图.png" alt="平台项目架构图（六层）">
+      <div class="chart-cap">六层各司其职：业务门户与运维台双入口经统一网关收口，Python 编排层与 Java 智能体跨语言互调，计量落账异步解耦</div>
+    </div>
+    <div class="blk-t">关键技术选型</div>
+    <div class="tbl"><table>
+      <tr><th>层次</th><th>选型</th><th>选择理由</th></tr>
+      <tr><td>统一网关</td><td>Spring Cloud Gateway</td><td>REST API / AI 智能体 / MCP 工具三通道收口鉴权、限流与 Token 计量，避免各服务重复实现</td></tr>
+      <tr><td>注册与配置</td><td>Nacos</td><td>服务发现 + 配置中心二合一，能注册的服务全部走发现，不支持硬编码寻址</td></tr>
+      <tr><td>编排引擎</td><td>LangGraph（Python）</td><td>图式编排天然支持条件路由与回边，适配"意图识别 → 取数 → 算法 → 报表"多分支工作流</td></tr>
+      <tr><td>智能体服务</td><td>Spring Boot · Dubbo · Spring AI</td><td>与既有微服务体系一致，账管等业务与数据能力直接复用，跨语言经网关签名回调</td></tr>
+      <tr><td>知识库检索</td><td>PGVector</td><td>复用 PostgreSQL 承载向量检索，知识问答不新增中间件栈</td></tr>
+      <tr><td>缓存与消息</td><td>Redis · RabbitMQ</td><td>数字员工配置热更新缓存；库存巡检告警异步解耦</td></tr>
+    </table></div>
+  </div>
+</section>
+
+<!-- ═══ 编排核心（三智能体链） ═══ -->
+<section id="core" style="padding: 40px 0 48px;">
+  <div class="wrap">
+    <div class="sec-head">
+      <div class="eyebrow">四、编排核心</div>
+      <h2>三智能体协作链 · 模型决策、代码计算</h2>
+      <p>针对大模型在企业场景"编造数字、输出不稳定"的落地障碍，
+       确立"模型决策、代码计算"的协作边界——LLM 只决定调哪些分析工具，计算全在确定性代码。
+       三智能体指补货调拨核心链（取数 → 算法 → 报表）；意图识别是前置公共路由，
+       知识库、图表、质检等能力由画布按场景编排（见第六章）</p>
+    </div>
+    <div class="chart-box">
+      <img src="智能体协作图.png" alt="Agent 工作流编排与多智能体协作图">
+    </div>
+    <div class="blk-t">三智能体职责与协作边界</div>
+    <div class="tbl"><table>
+      <tr><th>环节</th><th>执行者</th><th>职责</th><th>输出 / 降级</th></tr>
+      <tr><td>意图识别</td><td>AI 智能路由</td><td>判断用户意图：知识问答 / 补货建议 / 调拨执行，决定工作流分支</td><td>非业务诉求转入知识库问答兜底</td></tr>
+      <tr><td>取数</td><td>取数智能体</td><td>经网关调用账管服务，按仓位 / 状态 / 型号 / 库龄 / 在途查询库存</td><td>取数失败即终止并如实提示，禁止用猜测值续算</td></tr>
+      <tr><td>计算</td><td>算法智能体</td><td>确定性算法：周使用量 = 近 3 月日均 × 7，缺口 = 预测需求 −（可用 + 在途），不经大模型</td><td>同一输入永远得到同一清单，结果可复算</td></tr>
+      <tr><td>产出</td><td>报表 / 账管智能体</td><td>生成采购 / 调拨清单卡片，可导出 Excel，账管一键申请调拨</td><td>调拨校验不通过原路退回，重新发起</td></tr>
+    </table></div>
+    <div class="effect">决策边界：模型只做意图识别与工具路由，数字全部出自确定性算法——清单可复算、可审计，杜绝大模型编造数据</div>
+  </div>
+</section>
+
+<!-- ═══ 报表生成智能体 ═══ -->
+<section id="report" style="padding: 40px 0 48px; background: #f8f7fc;">
+  <div class="wrap">
+    <div class="sec-head">
+      <div class="eyebrow">五、报表生成智能体</div>
+      <h2>对话直出报表，形态按数据特征自动选</h2>
+      <p>一句"各仓库存分布"经意图识别分流到报表生成链——图表选型师智能体按数据特征挑选形态，
+       条形 / 饼图 / 折线 / 表格随时切换；知识库问答与报表生成共用同一条编排入口</p>
+    </div>
+    <div class="chart-box">
+      <img src="报表门户总起页.png" alt="门户对话总起页">
+      <div class="chart-cap">门户总起页：库存统计卡直连真实数据，对话框输入即发起编排——图中为东宁仓管视角，"思考中"即编排层正在调度</div>
+    </div>
+    <div class="blk-t">同一份报表 · 四种形态</div>
+    <div class="grid2">
+      <div class="chart-box"><img src="报表形态条形.png" alt="条形图形态">
+        <div class="chart-cap">条形：仓间对比直观——东宁市分公司 27,916 台 / 新区分公司 3,838 台</div></div>
+      <div class="chart-box"><img src="报表形态饼图.png" alt="饼图形态">
+        <div class="chart-cap">饼图：占比构成一目了然（87.9% / 12.1%）</div></div>
+      <div class="chart-box"><img src="报表形态折线.png" alt="折线图形态">
+        <div class="chart-cap">折线：仓间相对水平与走势</div></div>
+      <div class="chart-box"><img src="报表形态表格.png" alt="表格形态">
+        <div class="chart-cap">表格：明细与占比，可复核可导出</div></div>
+    </div>
+    <div class="effect">同一编排内核的第二条业务链：接入新场景 = 配置数字员工 + 注册工具，不改代码</div>
+  </div>
+</section>
+
+<!-- ═══ 零代码运维台 ═══ -->
+<section id="ops" style="padding: 40px 0 48px;">
+  <div class="wrap">
+    <div class="sec-head">
+      <div class="eyebrow">六、零代码运维台</div>
+      <h2>新场景接入，从改代码发版到配置即上线</h2>
+      <p>数字员工内核配置驱动：人设 / 模型 / 技能 / 工具 / 知识库全可视化挂载，保存即热更新；
+       工作流画布拖拽编排、DSL 版本化管理，发布与回滚即时生效——高危调用落审批闭环，调用全量审计</p>
+    </div>
+    <div class="chart-box">
+      <a href="运维台配置总览.png" target="_blank"><img src="运维台配置总览.png" alt="数字员工配置总览"></a>
+      <div class="chart-cap">配置总览：左侧 9 个数字员工随时新增，右侧运行预览实时呈现装配结果——模型、温度、技能包、工具、知识库一目了然</div>
+    </div>
+    <div class="blk-t">配置明细 · 可视化挂载</div>
+    <div class="grid2">
+      <div class="chart-box"><a href="运维台配置明细上.png" target="_blank"><img src="运维台配置明细上.png" alt="配置明细：基本信息与提示词"></a>
+        <div class="chart-cap">基本信息 · 模型设置 · 人设提示词——人设只写基底，"涉及库存数字必须调用工具查询真实数据，绝不编造"直接写进提示词</div></div>
+      <div class="chart-box"><a href="运维台配置明细下.png" target="_blank"><img src="运维台配置明细下.png" alt="配置明细：技能与工具挂载"></a>
+        <div class="chart-cap">技能包 / 工具 / 知识库 / 可用角色——可视化挂载、即挂即生效，能力组合免代码调整</div></div>
+    </div>
+    <div class="blk-t">编排可视化 · 执行可审计</div>
+    <div class="grid2">
+      <div class="chart-box"><a href="运维台画布编排.png" target="_blank"><img src="运维台画布编排.png" alt="工作流画布编排与版本管理"></a>
+        <div class="chart-cap">工作流从画布到生产：节点库 8 大类 37 个节点，拖拽连线即可调整编排（意图路由 → 取数 / 知识库 → 算法 → 质检 → 回炉 / 降级），节点参数支持 JSON 级微调；DSL 落库版本化管理——v23 当前生效、历史版本一键回滚，改流程不改代码、不发版</div></div>
+      <div class="chart-box"><a href="运维台调用审计.png" target="_blank"><img src="运维台调用审计.png" alt="调用审计"></a>
+        <div class="chart-cap">调用审计：451 次工具调用全量落库（失败 15 · 均 1238ms · 14 个工具），按工具聚合耗时与失败——排障以此为准，模型自述不作数</div></div>
+    </div>
+    <div class="effect">配置即上线：新增一个数字员工 = 填人设 + 挂工具，全程零代码、不发版</div>
+  </div>
+</section>
+
+<!-- ═══ Token 治理 ═══ -->
+<section id="token" style="padding: 40px 0 48px; background: #f8f7fc;">
+  <div class="wrap">
+    <div class="sec-head">
+      <div class="eyebrow">七、Token 计量配额</div>
+      <h2>成本看得见、控得住</h2>
+      <p>多智能体协作能力越强，Token 成本越不可控——计量配额是能力的另一面</p>
+    </div>
+    <div class="grid2">
+      <div class="barcard" style="--accent:#6d5bd0"><div class="t">用量可见</div>
+        <div class="d">按人 / 按智能体统计调用次数与 Token 消耗，管理台看板呈现活跃度与趋势——
+         平台是否真的提效，数据说话</div></div>
+      <div class="barcard" style="--accent:#0d6b60"><div class="t">配额可控</div>
+        <div class="d">按人月度配额（scope 灵活分配），调用前预检、事后计费，超额自动停用、次日恢复</div></div>
+    </div>
+    <div class="blk-t">计量配额闭环</div>
+    <div class="steps">
+      <div class="step"><div class="sn">1</div><div class="st">调用前预检</div><div class="sd">网关校验剩余配额，不足直接拒绝</div></div>
+      <div class="step"><div class="sn">2</div><div class="st">调用中计量</div><div class="sd">按次与 Token 双维度记账</div></div>
+      <div class="step"><div class="sn">3</div><div class="st">调用后归集</div><div class="sd">按人 / 智能体 / 租户月度汇总</div></div>
+      <div class="step"><div class="sn">4</div><div class="st">超额处置</div><div class="sd">超额自动停用，次日恢复</div></div>
+    </div>
+    <div class="blk-t">运行实况</div>
+    <div class="grid2">
+      <div class="chart-box">
+        <a href="token用量看板.png" target="_blank"><img src="token用量看板.png" alt="Token 用量分配看板"></a>
+        <div class="chart-cap">运维台用量看板：用量 / 调用次数 Top5、功能调用分布、智能体用量，正常 / 接近上限 / 已超限分色</div>
+      </div>
+      <div class="chart-box">
+        <a href="token配额调整.png" target="_blank"><img src="token配额调整.png" alt="配额规则调整"></a>
+        <div class="chart-cap">配额调整：按用户设月度上限、保存即时生效，接近上限自动预警（新区账管 100 万已用 85%）</div>
+      </div>
+    </div>
+    <div class="effect">计量在网关层收口：所有模型调用必经网关——9 个智能体累计计量 871.3 万 tokens、13 类功能累计调用 12,986 次，配额命中即预警、超限直接拒绝</div>
+  </div>
+</section>
+
+<!-- ═══ 安全纵深防御 ═══ -->
+<section id="sec" style="padding: 40px 0 48px;">
+  <div class="wrap">
+    <div class="sec-head">
+      <div class="eyebrow">八、纵深防御体系</div>
+      <h2>多层安全 · 纵深防御</h2>
+      <p>从入口鉴权到数据权限，从传输加密到审计回放——层层递进、纵深布防</p>
+    </div>
+    <div class="grid2">
+      <div class="barcard" style="--accent:#2f7fd1"><div class="t">三通道鉴权</div>
+        <div class="d">AK/SK 签名（第三方开发者）、Bearer 令牌（门户用户）、MCP 协议（AI 应用）——同一网关，分类放行</div></div>
+      <div class="barcard" style="--accent:#0d6b60"><div class="t">数据权限信任根</div>
+        <div class="d">网关注入用户身份、下游不信任自报参数——越权用例拦截 8/8，基层用户只看本仓</div></div>
+      <div class="barcard" style="--accent:#d97706"><div class="t">中间件纵深加固</div>
+        <div class="d">Redis requirepass · RabbitMQ 最小权限 · MySQL 角色分离 · 监听收口回环——全链路收口</div></div>
+      <div class="barcard" style="--accent:#a33c38"><div class="t">写链路授权</div>
+        <div class="d">写授权回归 6/6，非 OA 路径全通道剥离——写操作不越权、不静默</div></div>
+    </div>
+    <div class="blk-t">四层布防</div>
+    <div class="steps">
+      <div class="step"><div class="sn">1</div><div class="st">入口鉴权</div><div class="sd">AK/SK 签名 · Bearer 令牌 · MCP 协议</div></div>
+      <div class="step"><div class="sn">2</div><div class="st">流量防线</div><div class="sd">限流 · 配额预检 · 超额即拒</div></div>
+      <div class="step"><div class="sn">3</div><div class="st">编排防线</div><div class="sd">网关签名回调 · 审批闭环 · 调用审计</div></div>
+      <div class="step"><div class="sn">4</div><div class="st">数据防线</div><div class="sd">身份注入 · 中间件最小权限 · 角色分离</div></div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══ 验收与运行数据 ═══ -->
+<section id="num" style="padding: 40px 0 48px; background: #f8f7fc;">
+  <div class="wrap">
+    <div class="sec-head">
+      <div class="eyebrow">九、验收与运行数据</div>
+      <h2>交付可验收 · 运行可复核</h2>
+      <p>验收数字来自交付演示，运行数字来自线上真实使用——每一项都能在管理台与运维台页面复核</p>
+    </div>
+    <div class="tbl"><table>
+      <tr><th>指标</th><th>数值</th><th>口径说明</th></tr>
+      <tr><td>编排版本迭代</td><td>23 个版本</td><td>工作流画布 DSL 版本化管理，当前 v23 生效、历史可回滚</td></tr>
+      <tr><td>功能验收</td><td>48 / 48 项通过</td><td>功能清单逐项演示验收，覆盖补货建议、调拨闭环、知识问答、计量配额</td></tr>
+      <tr><td>自动化测试</td><td>102 个用例</td><td>接口与服务层自动化回归</td></tr>
+      <tr><td>库存告警巡检</td><td>10 分钟周期</td><td>编排工作流定时扫描库存，超警戒线自动触发告警</td></tr>
+    </table></div>
+    <div class="effect">安全专项回归：越权用例拦截 8/8 · 写授权回归 6/6</div>
+  </div>
+</section>
+
+<!-- ═══ 页脚 ═══ -->
+<footer style="border-top: 1px solid var(--line); margin-top: 40px; padding: 34px 36px 60px; text-align: center; color: #8b8ba3; font-size: 12.5px;">
+  终端 AI 智慧管理平台 · 项目展示页 ｜ 智营先锋团 ｜ 架构：自研 Agent 网关 + LangGraph 编排层 ｜ 数据截至 2026-10
+</footer>
+
+<script>
+  // 平滑滚动
+  document.querySelectorAll('a[href^="#"]').forEach(a => {
+    a.addEventListener('click', e => {
+      e.preventDefault();
+      const h = a.getAttribute('href');
+      if (h === '#top') { window.scrollTo({ top: 0, behavior: 'smooth' }); return; }
+      const t = document.querySelector(h);
+      if (t) t.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    });
+  });
+  // 滚动定位：当前所在章节导航高亮
+  const navLinks = Array.from(document.querySelectorAll('.nav .links a'));
+  const spySecs = navLinks.map(a => document.querySelector(a.getAttribute('href'))).filter(Boolean);
+  function spy() {
+    const pos = window.scrollY + 100;
+    let cur = -1;
+    spySecs.forEach((s, k) => { if (s.offsetTop <= pos) cur = k; });
+    navLinks.forEach(a => a.classList.remove('on'));
+    if (cur >= 0) navLinks[cur].classList.add('on');
+  }
+  window.addEventListener('scroll', spy, { passive: true });
+  spy();
+</script>
+</body>
+</html>

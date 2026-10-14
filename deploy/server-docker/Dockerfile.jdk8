@@ -1,0 +1,18 @@
+# JDK8 应用镜像（backend / gateway / interface 共用，用 JAR 参数区分）
+# 构建前提：宿主机已有对应 jar（bootstrap.sh 会先在本机构建并收集）
+FROM eclipse-temurin:8-jre
+
+ARG JAR
+ENV APP_JAR=/app/${JAR}
+
+# 时区与中文编码
+ENV TZ=Asia/Shanghai LANG=C.UTF-8
+
+COPY jars/${JAR} /app/app.jar
+
+# 以非 root 运行
+RUN useradd -r -u 1001 appuser && chown -R appuser /app
+USER appuser
+
+EXPOSE 8080
+ENTRYPOINT ["sh", "-c", "exec java -Dfile.encoding=UTF-8 $JAVA_TOOL_OPTIONS -jar /app/app.jar"]

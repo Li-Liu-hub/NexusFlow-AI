@@ -1,0 +1,96 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 720 620" font-family="PingFang SC, Microsoft YaHei, sans-serif">
+  <defs>
+    <marker id="arr" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="8" markerHeight="8" markerUnits="userSpaceOnUse" orient="auto">
+      <path d="M1 1 L7 4 L1 7 Z" fill="#71717A"/>
+    </marker>
+    <marker id="arrBrand" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="8" markerHeight="8" markerUnits="userSpaceOnUse" orient="auto">
+      <path d="M1 1 L7 4 L1 7 Z" fill="#02743B"/>
+    </marker>
+  </defs>
+
+  <style>
+    .t   { fill:#18181B; font-size:14px; font-weight:500; }
+    .ts  { fill:#52525B; font-size:12px; }
+    .tb  { fill:#004D26; font-size:12px; }
+    .box { fill:#F7F7F8; stroke:#D4D4D8; stroke-width:1; rx:10; }
+    .cap { fill:#F7F7F8; stroke:#D4D4D8; stroke-width:1; }
+    .arr { stroke:#71717A; stroke-width:1.5; fill:none; stroke-linecap:round; }
+  </style>
+
+  <!-- ===== 第一层：前端 ===== -->
+  <rect class="cap" x="120" y="24" width="210" height="52" rx="10"/>
+  <text class="t"  x="225" y="46" text-anchor="middle">门户前端 portal.html</text>
+  <text class="ts" x="225" y="64" text-anchor="middle">原生 JS · 对话 / 工单 / 通知</text>
+
+  <rect class="cap" x="390" y="24" width="210" height="52" rx="10"/>
+  <text class="t"  x="495" y="46" text-anchor="middle">管理台前端（React · Vite）</text>
+  <text class="ts" x="495" y="64" text-anchor="middle">:8091 回环 · SSH 隧道访问</text>
+
+  <!-- ===== 第二层：nginx ===== -->
+  <rect class="cap" x="120" y="122" width="480" height="44" rx="10"/>
+  <text class="t"  x="360" y="140" text-anchor="middle">nginx :80（公网唯一入口）</text>
+  <text class="ts" x="360" y="158" text-anchor="middle">门户静态资源 · /api 反代网关 · /admin/ 管理台</text>
+
+  <!-- ===== 第三层：网关（焦点） ===== -->
+  <rect x="100" y="212" width="520" height="66" rx="10" fill="#E5FFF2" stroke="#0FDC78" stroke-width="1.5"/>
+  <text class="t" x="360" y="236" text-anchor="middle">aismp-gateway :8090（Spring Cloud Gateway · 信任根）</text>
+  <text class="tb" x="360" y="254" text-anchor="middle">双通道：门户 Bearer（注入 X-User-*，剥离伪造头）｜服务方 AK/SK 验签</text>
+  <text class="tb" x="360" y="270" text-anchor="middle">interface_info 注册表校验 · 限流 · 响应计量</text>
+
+  <!-- ===== 连线：前端→nginx→网关 ===== -->
+  <path class="arr" d="M225 76 L225 118" marker-end="url(#arr)"/>
+  <path class="arr" d="M495 76 L495 118" marker-end="url(#arr)"/>
+  <path class="arr" d="M360 166 L360 208" marker-end="url(#arr)"/>
+
+  <!-- ===== 第四层：四个服务 ===== -->
+  <rect class="cap" x="24"  y="330" width="156" height="88" rx="10"/>
+  <text class="t"  x="102" y="352" text-anchor="middle">aismp-backend</text>
+  <text class="ts" x="102" y="368" text-anchor="middle">:7529 · context /api</text>
+  <text class="ts" x="102" y="384" text-anchor="middle">鉴权 · 配额 · 计量账本</text>
+  <text class="ts" x="102" y="400" text-anchor="middle">管理面（Agent/KB/MCP）</text>
+
+  <rect class="cap" x="196" y="330" width="156" height="88" rx="10"/>
+  <text class="t"  x="274" y="352" text-anchor="middle">agent-orchestrator</text>
+  <text class="ts" x="274" y="368" text-anchor="middle">:8125 · Python LangGraph</text>
+  <text class="ts" x="274" y="384" text-anchor="middle">图表 / 补仓调拨 / 知识问答</text>
+  <text class="ts" x="274" y="400" text-anchor="middle">告警闭环 · 意图纯 AI 路由</text>
+
+  <rect class="cap" x="368" y="330" width="156" height="88" rx="10"/>
+  <text class="t"  x="446" y="352" text-anchor="middle">aismp-agent</text>
+  <text class="ts" x="446" y="368" text-anchor="middle">:8124 · Spring AI</text>
+  <text class="ts" x="446" y="384" text-anchor="middle">原子接口 · 工具后端</text>
+  <text class="ts" x="446" y="400" text-anchor="middle">调拨状态机 · 可见范围校验</text>
+
+  <rect class="cap" x="540" y="330" width="156" height="88" rx="10"/>
+  <text class="t"  x="618" y="352" text-anchor="middle">aismp-digital-human</text>
+  <text class="ts" x="618" y="368" text-anchor="middle">:8126 · 数字员工内核</text>
+  <text class="ts" x="618" y="384" text-anchor="middle">Agent 装配 · RAG(pgvector)</text>
+  <text class="ts" x="618" y="400" text-anchor="middle">MCP 工具 · 记忆</text>
+
+  <!-- ===== 连线：网关扇出到四服务 ===== -->
+  <path class="arr" d="M250 278 C 180 300, 120 310, 102 326" marker-end="url(#arr)"/>
+  <path class="arr" d="M310 278 C 290 296, 280 310, 274 326" marker-end="url(#arr)"/>
+  <path class="arr" d="M410 278 C 430 296, 440 310, 446 326" marker-end="url(#arr)"/>
+  <path class="arr" d="M470 278 C 540 300, 600 310, 618 326" marker-end="url(#arr)"/>
+
+  <!-- 编排层 ↔ 取数（经网关签名，虚线语义） -->
+  <path d="M282 418 L282 442 L446 442 L446 422" stroke="#02743B" stroke-width="1.5" fill="none"
+        stroke-dasharray="5 4" stroke-linecap="round" marker-end="url(#arrBrand)"/>
+  <text class="ts" x="364" y="458" text-anchor="middle">编排层取数：经网关 AK/SK 签名回调</text>
+
+  <!-- ===== 第五层：基础设施 ===== -->
+  <rect x="24" y="470" width="672" height="56" rx="10" fill="#EFEFF2" stroke="#D4D4D8" stroke-width="1"/>
+  <text class="t" x="48" y="494">基础设施</text>
+  <text class="ts" x="48" y="512">systemd 直跑 · 2C/4G · 仅放行 22/80</text>
+  <text class="t" x="262" y="494">MySQL api_db / terminal_db</text>
+  <text class="ts" x="262" y="512">业务 + 平台</text>
+  <text class="t" x="465" y="494">Redis · RabbitMQ</text>
+  <text class="ts" x="465" y="512">令牌 · 计量异步</text>
+  <text class="t" x="588" y="494">PG · Nacos</text>
+  <text class="ts" x="588" y="512">向量(pgvector) · 注册</text>
+
+  <!-- ===== 图例 ===== -->
+  <text class="ts" x="24" y="560">连线：实线 = 请求经停；虚线 = 服务间经网关签名的回调取数。</text>
+  <text class="ts" x="24" y="580">计量链路：网关 → RabbitMQ → aismp-backend 消费落库（失败降级同步 HTTP）。</text>
+  <text class="ts" x="24" y="600">数据权限：门户请求由网关注入 X-User-*，下游按「本仓 + 下级仓」可见范围过滤（服务方通道 AK/SK 不受限）。</text>
+</svg>

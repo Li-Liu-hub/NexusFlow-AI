@@ -1,0 +1,107 @@
+spring:
+  application:
+    name: aismp-agent
+  # 服务注册与发现（Nacos 3.2.4，主端口 8848）
+  # 版本矩阵：spring-cloud-alibaba-dependencies 2025.1.0.0 → Spring Cloud 2025.1.0 → Spring Boot 4.0.x
+  # 内置 nacos-client 3.1.1，与 Nacos Server 3.2.4 匹配（2.x 老客户端连不上 3.x server）
+  cloud:
+    nacos:
+      discovery:
+        server-addr: ${NACOS_ADDR:127.0.0.1:8848}
+        namespace: public
+        # 注册的是 IP:端口，供其他节点按服务名发现与调用
+        register-enabled: true
+        # 【必需】本机装了 VMware/WSL，存在虚拟网卡 192.168.150.1；
+        # 不指定时 Nacos 会选中它作为注册 IP，导致同机其他服务按服务名调用时连不上。
+        # 本机开发统一用回环地址。
+        ip: 127.0.0.1
+  datasource:
+    url: jdbc:postgresql://127.0.0.1:5432/terminal_kb
+    username: my_user
+    password: ${PG_PASSWORD:}
+    driver-class-name: org.postgresql.Driver
+  ai:
+    openai:
+      # 本机部署：走小米 MiMo 的 OpenAI 兼容端点（原为智谱 z.ai coding plan）
+      api-key: ${MIMO_API_KEY:}
+      base-url: https://api.xiaomimimo.com
+      chat:
+        # Spring AI 默认即 /v1/chat/completions；z.ai 原本写 /chat/completions，这里恢复默认
+        completions-path: /v1/chat/completions
+        options:
+          model: mimo-v2.6-flash
+          temperature: 0.7
+      # 嵌入模型走硅基流动的 BAAI/bge-m3（1024 维，与 pgvector vector(1024) 严格一致）
+      # MiMo 只提供 chat/asr/tts、没有 embedding 接口，所以嵌入必须外接
+      # Key 走环境变量 SILICONFLOW_API_KEY，绝不写进仓库
+      embedding:
+        base-url: https://api.siliconflow.cn
+        api-key: ${SILICONFLOW_API_KEY:}
+        options:
+          model: BAAI/bge-m3
+      retry:
+        max-attempts: 0
+        backoff:
+          initial-interval: 2000
+          multiplier: 2
+    vectorstore:
+      pgvector:
+        index-type: HNSW
+        distance-type: COSINE_DISTANCE
+        dimensions: 1024
+        initialize-schema: true
+    # MCP Server 配置（让其他 AI 应用通过 MCP 协议调用 OA 查询工具）
+    mcp:
+      server:
+        name: oa-mcp-server
+        version: 1.0.0
+        type: SYNC
+        sse-message-endpoint: /mcp/message
+        sse-endpoint: /sse
+
+server:
+    port: 8124
+# springdoc-openapi ??????
+springdoc:
+  swagger-ui:
+    path: /swagger-ui.html
+    tags-sorter: alpha
+    operations-sorter: alpha
+  api-docs:
+    path: /v3/api-docs
+  group-configs:
+    - group: 'default'
+      paths-to-match: '/**'
+      packages-to-scan: com.aismp.aismpagent.controller,com.aismp.aismpagent.demo
+# knife4j???????????????
+knife4j:
+  enable: true
+  setting:
+    language: zh_cn
+
+# ============================================================
+# 终端业务数据源（MySQL）—— 阶段1 从 aismp-backend 迁入
+# ============================================================
+# 本模块现在有两个数据源，别搞混：
+#   spring.datasource  → PostgreSQL（Spring AI 的向量库 + 对话记忆，自动配置依赖它）
+#   business.datasource → MySQL（terminal / warehouse / transfer_order / … 业务表）
+# 绑定与 Mapper 扫描见 com.aismp.aismpagent.terminal.config.BusinessDataSourceConfig
+#
+# 注意：这里必须用 jdbc-url（不是 url）—— DataSourceBuilder 认的是 jdbc-url
+business:
+  datasource:
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    jdbc-url: jdbc:mysql://127.0.0.1:3306/api_db?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai&useSSL=false&allowPublicKeyRetrieval=true
+    username: ${MYSQL_USER:root}
+    password: ${MYSQL_PASSWORD:123456}
+    hikari:
+      maximum-pool-size: 8
+      minimum-idle: 2
+
+# ============================================================
+# 业务参数
+# ============================================================
+# 库存告警巡检周期已上移到编排层（agent-orchestrator 的 alert 图）配置：
+#   本服务只提供原子能力 POST /terminal/stockAlert/scan（查+判定）与
+#   POST /transferOrder/notice（写通知，去重）；定时触发不再由本服务承担。
+#   编排层周期配置见 agent-orchestrator 的 ALERT_INTERVAL_SECONDS（默认 600 秒）。

@@ -1,0 +1,194 @@
+[
+  {
+    "id": 1001,
+    "type": "域外-生活常识",
+    "question": "太阳花怎么养",
+    "expected_doc": null,
+    "keywords": [
+      "太阳花",
+      "播种"
+    ]
+  },
+  {
+    "id": 1002,
+    "type": "域外-生活常识",
+    "question": "感冒了吃什么好得快",
+    "expected_doc": null,
+    "keywords": [
+      "感冒"
+    ]
+  },
+  {
+    "id": 1003,
+    "type": "域外-历史人物",
+    "question": "李白是哪个朝代的诗人",
+    "expected_doc": null,
+    "keywords": [
+      "李白",
+      "唐朝"
+    ]
+  },
+  {
+    "id": 1004,
+    "type": "域外-地理",
+    "question": "长江有多长",
+    "expected_doc": null,
+    "keywords": [
+      "长江",
+      "公里"
+    ]
+  },
+  {
+    "id": 1005,
+    "type": "域外-科技",
+    "question": "5G 和 4G 有什么区别",
+    "expected_doc": null,
+    "keywords": [
+      "5G",
+      "4G"
+    ]
+  },
+  {
+    "id": 1006,
+    "type": "域外-烹饪",
+    "question": "红烧肉怎么做才好吃",
+    "expected_doc": null,
+    "keywords": [
+      "红烧肉"
+    ]
+  },
+  {
+    "id": 1007,
+    "type": "域外-教育",
+    "question": "考研数学怎么复习",
+    "expected_doc": null,
+    "keywords": [
+      "考研",
+      "数学"
+    ]
+  },
+  {
+    "id": 1008,
+    "type": "域外-医疗",
+    "question": "高血压要注意什么",
+    "expected_doc": null,
+    "keywords": [
+      "高血压"
+    ]
+  },
+  {
+    "id": 1009,
+    "type": "域外-旅游",
+    "question": "三亚旅游攻略",
+    "expected_doc": null,
+    "keywords": [
+      "三亚",
+      "攻略"
+    ]
+  },
+  {
+    "id": 1010,
+    "type": "域外-金融",
+    "question": "基金定投是什么意思",
+    "expected_doc": null,
+    "keywords": [
+      "基金定投"
+    ]
+  },
+  {
+    "id": 1011,
+    "type": "域外-法律",
+    "question": "劳动法规定试用期最长多久",
+    "expected_doc": null,
+    "keywords": [
+      "试用期",
+      "劳动法"
+    ]
+  },
+  {
+    "id": 1012,
+    "type": "域外-影视",
+    "question": "最近有什么好看的电影",
+    "expected_doc": null,
+    "keywords": [
+      "电影"
+    ]
+  },
+  {
+    "id": 1013,
+    "type": "域外-体育",
+    "question": "世界杯几年举办一次",
+    "expected_doc": null,
+    "keywords": [
+      "世界杯"
+    ]
+  },
+  {
+    "id": 1014,
+    "type": "域外-生活技巧",
+    "question": "白衣服发黄怎么洗白",
+    "expected_doc": null,
+    "keywords": [
+      "白衣服",
+      "发黄"
+    ]
+  },
+  {
+    "id": 1015,
+    "type": "域外-汽车",
+    "question": "新能源车充电要多久",
+    "expected_doc": null,
+    "keywords": [
+      "新能源",
+      "充电"
+    ]
+  },
+  {
+    "id": 1016,
+    "type": "域外-宠物",
+    "question": "小猫多大可以打疫苗",
+    "expected_doc": null,
+    "keywords": [
+      "小猫",
+      "疫苗"
+    ]
+  },
+  {
+    "id": 1017,
+    "type": "域外-职场",
+    "question": "面试自我介绍怎么说",
+    "expected_doc": null,
+    "keywords": [
+      "面试",
+      "自我介绍"
+    ]
+  },
+  {
+    "id": 1018,
+    "type": "域外-健康",
+    "question": "每天喝多少水合适",
+    "expected_doc": null,
+    "keywords": [
+      "喝水"
+    ]
+  },
+  {
+    "id": 1019,
+    "type": "域外-家居",
+    "question": "怎么去除冰箱异味",
+    "expected_doc": null,
+    "keywords": [
+      "冰箱",
+      "异味"
+    ]
+  },
+  {
+    "id": 1020,
+    "type": "域外-数码",
+    "question": "手机电池怎么保养",
+    "expected_doc": null,
+    "keywords": [
+      "手机电池"
+    ]
+  }
+]

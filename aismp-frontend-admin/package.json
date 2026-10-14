@@ -1,0 +1,24 @@
+{
+  "name": "aismp-frontend-admin",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "description": "终端 AI 智慧管理平台 · 管理端（数字员工 / 工具 / 审计 运维台）",
+  "scripts": {
+    "dev": "vite --host 127.0.0.1 --port 5174",
+    "build": "vite build",
+    "preview": "vite preview --host 127.0.0.1 --port 4174"
+  },
+  "dependencies": {
+    "@emotion/hash": "^0.9.2",
+    "@emotion/unitless": "^0.10.0",
+    "antd": "^5.22.2",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "reactflow": "^11.11.4"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-react": "^4.3.4",
+    "vite": "^5.4.11"
+  }
+}

@@ -1,0 +1,26 @@
+[
+  {"id": 1, "question": "密码忘了怎么重置", "expected_doc": "account/01-密码忘了怎么重置.md", "type": "简单事实", "keywords": ["密码", "重置", "忘记"]},
+  {"id": 2, "question": "阶梯电价怎么算", "expected_doc": "electricity/02-阶梯电价怎么算.md", "type": "简单事实", "keywords": ["阶梯电价", "计算", "电费"]},
+  {"id": 3, "question": "工单提交后多久能审批完", "expected_doc": "workflow/01-工单提交后多久能审批完.md", "type": "简单事实", "keywords": ["工单", "审批", "时效"]},
+  {"id": 4, "question": "电费稽核是什么流程", "expected_doc": "electricity/01-电费稽核是什么流程.md", "type": "简单事实", "keywords": ["稽核", "流程", "电费"]},
+
+  {"id": 5, "question": "密码忘了", "expected_doc": "account/01-密码忘了怎么重置.md", "type": "口语化", "keywords": ["密码", "忘了"]},
+  {"id": 6, "question": "报表导不出来", "expected_doc": "error/04-报表导出失败.md", "type": "口语化", "keywords": ["报表", "导不出"]},
+  {"id": 7, "question": "文件太大了传不上去", "expected_doc": "operation/03-附件上传不了或文件太大.md", "type": "口语化", "keywords": ["文件", "太大", "上传"]},
+  {"id": 8, "question": "页面白屏了", "expected_doc": "operation/04-页面加载不出来或白屏.md", "type": "口语化", "keywords": ["白屏", "页面", "加载"]},
+  {"id": 9, "question": "一直掉线怎么办", "expected_doc": "error/03-登录超时频繁掉线.md", "type": "口语化", "keywords": ["掉线", "登录", "频繁"]},
+
+  {"id": 10, "question": "电费异常怎么提工单", "expected_docs": ["electricity/03-电费异常怎么提工单.md", "workflow/01-工单提交后多久能审批完.md"], "type": "多意图", "keywords": ["电费", "异常", "工单", "提单"]},
+  {"id": 11, "question": "提交工单时提示提交失败", "expected_docs": ["error/02-工单提交失败或报错.md", "workflow/04-怎么撤回已提交的工单.md"], "type": "多意图", "keywords": ["提交", "失败", "工单"]},
+  {"id": 12, "question": "新来的同事看不到电费报表", "expected_docs": ["account/03-怎么申请系统权限.md", "electricity/04-电费报表怎么导出和查看.md"], "type": "多意图", "keywords": ["新同事", "权限", "电费", "报表"]},
+  {"id": 13, "question": "附件传不上去工单提交不了", "expected_docs": ["operation/03-附件上传不了或文件太大.md", "error/02-工单提交失败或报错.md"], "type": "多意图", "keywords": ["附件", "上传", "工单", "提交"]},
+
+  {"id": 14, "question": "Flowable 流程怎么配置审批人", "expected_doc": "workflow/07-审批人是谁怎么查.md", "type": "专有名词", "keywords": ["Flowable", "流程", "审批人"]},
+  {"id": 15, "question": "阶梯电价第二档是多少度", "expected_doc": "electricity/02-阶梯电价怎么算.md", "type": "专有名词", "keywords": ["阶梯电价", "第二档", "度"]},
+  {"id": 16, "question": "tm_order_track 工单流转记录怎么查", "expected_doc": "workflow/02-我的工单到哪一步了.md", "type": "专有名词", "keywords": ["tm_order_track", "工单", "流转"]},
+  {"id": 17, "question": "催办工单后钉钉没收到通知", "expected_doc": "workflow/06-怎么催办工单.md", "type": "专有名词", "keywords": ["催办", "钉钉", "通知"]},
+
+  {"id": 18, "question": "今天天气怎么样", "expected_doc": null, "type": "超纲", "keywords": []},
+  {"id": 19, "question": "怎么修改数据库里的数据", "expected_doc": null, "type": "超纲", "keywords": ["数据库", "修改"]},
+  {"id": 20, "question": "怎么重装操作系统", "expected_doc": null, "type": "超纲", "keywords": ["重装", "系统"]}
+]

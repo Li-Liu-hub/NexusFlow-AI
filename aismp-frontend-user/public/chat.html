@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta http-equiv="Cache-Control" content="no-store" />
+  <title>终端小助手</title>
+  <style>
+    /* 全部使用显式高度 + 块级布局，不依赖 flex 收缩 —— 结构上杜绝裁切问题 */
+    * { box-sizing: border-box; }
+    html, body { height: 100%; margin: 0; }
+    body {
+      font-family: -apple-system, 'PingFang SC', 'Microsoft YaHei', sans-serif;
+      background: #f7f8fa; color: #262626; font-size: 13px;
+      display: block; overflow: hidden;
+    }
+
+    /* 顶部：标题 + 数字员工切换 */
+    #head {
+      height: 92px; overflow-y: auto;
+      background: #185fa5; color: #fff; padding: 8px 10px;
+    }
+    #head .t { font-size: 14px; font-weight: 600; margin-bottom: 6px; }
+    #head .t .dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: #52c41a; margin-right: 6px; }
+    #empBar { display: flex; gap: 5px; }
+    .emp {
+      flex: 1; padding: 5px 3px; border-radius: 6px; text-align: center;
+      cursor: pointer; background: rgba(255,255,255,.14); border: 1px solid transparent;
+    }
+    .emp.active { background: #fff; }
+    .emp.active .n { color: #185fa5; }
+    .emp .n { font-size: 12px; font-weight: 600; color: #fff; }
+    .emp .d { font-size: 10px; color: #d0e2f5; margin-top: 1px; }
+    .emp.active .d { color: #7d9bbd; }
+
+    /* 消息区：高度 = 剩余空间（显式计算），滚动 */
+    #msgs {
+      height: calc(100% - 92px - 44px - 62px);
+      overflow-y: auto; padding: 10px;
+    }
+    .msg { max-width: 88%; padding: 8px 11px; border-radius: 10px; margin-bottom: 9px; line-height: 1.6; white-space: pre-wrap; word-break: break-word; }
+    .msg.a { background: #fff; border: 1px solid #e8e8e8; }
+    .msg.u { background: #185fa5; color: #fff; margin-left: auto; }
+    .msg table { border-collapse: collapse; font-size: 12px; margin: 6px 0; width: 100%; }
+    .msg th, .msg td { border: 1px solid #e5e5e5; padding: 4px 7px; text-align: left; }
+    .msg th { background: #fafafa; }
+    .meta { font-size: 10px; color: #b0b0b0; margin-top: 5px; }
+
+    /* 引导问题 */
+    #chips { height: 44px; overflow-y: auto; padding: 4px 10px; background: #fff; border-top: 1px solid #f0f0f0; }
+    .chip { display: inline-block; font-size: 11px; padding: 4px 9px; margin: 2px 3px 2px 0; border: 1px solid #d9d9d9; border-radius: 12px; cursor: pointer; color: #555; background: #fff; }
+    .chip:hover { border-color: #185fa5; color: #185fa5; }
+
+    /* 输入区 */
+    #inputRow { height: 62px; padding: 10px; background: #fff; border-top: 1px solid #f0f0f0; display: flex; gap: 7px; }
+    #inputBox { flex: 1; border: 1px solid #d9d9d9; border-radius: 6px; padding: 8px 10px; font-size: 13px; outline: none; resize: none; font-family: inherit; }
+    #inputBox:focus { border-color: #185fa5; }
+    #sendBtn { width: 64px; border: none; background: #185fa5; color: #fff; border-radius: 6px; font-size: 13px; cursor: pointer; }
+    #sendBtn:disabled { background: #a8c6e8; }
+  </style>
+</head>
+<body>
+  <div id="head">
+    <div class="t"><span class="dot"></span><span id="empName">查数助手</span> · 在线</div>
+    <div id="empBar"></div>
+  </div>
+  <div id="msgs"></div>
+  <div id="chips"></div>
+  <div id="inputRow">
+    <textarea id="inputBox" rows="2" placeholder="问点什么…（Enter 发送）"></textarea>
+    <button id="sendBtn">发送</button>
+  </div>
+
+  <script>
+    const EMP = [
+      { code: 'query_assistant',   name: '查数助手',   desc: '查库存串码' },
+      { code: 'replenish_advisor', name: '补仓推荐师', desc: '水位与建议' },
+      { code: 'ops_assistant',     name: '运维助手',   desc: '流程与排查' },
+    ];
+    const CHIPS = {
+      query_assistant:   ['西湖营业厅有多少台终端？', '各状态终端分布', 'CPE202600001 现在在哪'],
+      replenish_advisor: ['哪些仓位库存偏低？', '各城市库存分布', '给我一份库存水位分析'],
+      ops_assistant:     ['终端领用要走什么流程？', '盘点怎么操作？', '登录不上怎么办'],
+    };
+    const WELCOME = {
+      query_assistant:   '你好，我是查数助手。查库存、查串码、看分布统计，直接问。',
+      replenish_advisor: '你好，我是补仓推荐师。我先看库存水位，再给你补货方向建议。',
+      ops_assistant:     '你好，我是运维助手。操作流程、使用方法、故障排查，我查手册回答。',
+    };
+
+    let cur = EMP[0];
+    const convStore = {};
+    let busy = false;
+    const $ = (id) => document.getElementById(id);
+    const msgs = $('msgs');
+
+    // 自诊断：错误直接显示在消息区
+    window.addEventListener('error', (e) => addMsg('a', '[脚本错误] ' + e.message));
+    window.addEventListener('unhandledrejection', (e) => addMsg('a', '[请求异常] ' + (e.reason?.message || e.reason)));
+
+    function md2html(text) {
+      const esc = (s) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+      let html = '', inTable = false;
+      for (const line of esc(text || '').split('\n')) {
+        if (/^\s*\|.*\|\s*$/.test(line)) {
+          const cells = line.trim().replace(/^\||\|$/g, '').split('|').map((c) => c.trim());
+          if (/^[-: ]+$/.test(cells.join(''))) continue;
+          if (!inTable) { html += '<table>'; inTable = true; }
+          html += '<tr>' + cells.map((c) => `<td>${c.replace(/\*\*(.+?)\*\*/g, '<b>$1</b>')}</td>`).join('') + '</tr>';
+        } else {
+          if (inTable) { html += '</table>'; inTable = false; }
+          html += line.replace(/\*\*(.+?)\*\*/g, '<b>$1</b>') + '\n';
+        }
+      }
+      if (inTable) html += '</table>';
+      return html;
+    }
+
+    function addMsg(role, html, meta) {
+      const d = document.createElement('div');
+      d.className = 'msg ' + role;
+      d.innerHTML = html + (meta ? `<div class="meta">${meta}</div>` : '');
+      msgs.appendChild(d);
+      msgs.scrollTop = msgs.scrollHeight;
+    }
+
+    function renderEmpBar() {
+      $('empBar').innerHTML = EMP.map((e) => `
+        <div class="emp ${e.code === cur.code ? 'active' : ''}" data-code="${e.code}">
+          <div class="n">${e.name}</div><div class="d">${e.desc}</div>
+        </div>`).join('');
+    }
+
+    function renderChips() {
+      $('chips').innerHTML = (CHIPS[cur.code] || []).map((c) => `<span class="chip">${c}</span>`).join('');
+    }
+
+    function switchEmp(emp) {
+      cur = emp;
+      $('empName').textContent = emp.name;
+      renderEmpBar();
+      renderChips();
+      msgs.innerHTML = '';
+      addMsg('a', WELCOME[emp.code], '三个数字员工各有所长，点上方卡片换人');
+    }
+
+    async function ask(text) {
+      if (busy || !text.trim()) return;
+      busy = true;
+      $('sendBtn').disabled = true;
+      addMsg('u', text.replace(/&/g, '&amp;').replace(/</g, '&lt;'));
+      const tip = document.createElement('div');
+      tip.className = 'msg a';
+      tip.innerHTML = '正在查询数据库与知识库，<b>通常需要 10~30 秒</b>…';
+      msgs.appendChild(tip);
+      msgs.scrollTop = msgs.scrollHeight;
+      try {
+        const resp = await Promise.race([
+          fetch(`/api/agent/${cur.code}/chat`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              message: text,
+              conversationId: convStore[cur.code] || null,
+              userId: 'portal_user',
+            }),
+          }),
+          new Promise((_, rej) => setTimeout(() => rej(new Error('请求超时（90 秒）')), 90000)),
+        ]);
+        const data = await resp.json();
+        if (data.conversationId) convStore[cur.code] = data.conversationId;
+        tip.remove();
+        addMsg('a', md2html(data.answer || data.error || '(空)'),
+          data.error ? '' : `${cur.name} · v${data.version} · ${(data.elapsedMs / 1000).toFixed(1)}s`);
+      } catch (e) {
+        tip.remove();
+        addMsg('a', '连接失败：' + e.message);
+      } finally {
+        busy = false;
+        $('sendBtn').disabled = false;
+      }
+    }
+
+    $('sendBtn').addEventListener('click', () => { const v = $('inputBox').value; $('inputBox').value = ''; ask(v); });
+    $('inputBox').addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); const v = e.target.value; e.target.value = ''; ask(v); }
+    });
+    $('empBar').addEventListener('click', (e) => {
+      const el = e.target.closest('.emp');
+      if (!el) return;
+      const emp = EMP.find((x) => x.code === el.dataset.code);
+      if (emp && emp.code !== cur.code) switchEmp(emp);
+    });
+    $('chips').addEventListener('click', (e) => {
+      if (e.target.classList.contains('chip')) ask(e.target.textContent);
+    });
+
+    switchEmp(cur);
+  </script>
+</body>
+</html>

@@ -1,0 +1,19 @@
+# 2026-10-10 新增：防止把本地凭据打进镜像
+#
+# 背景：collect-artifacts.sh 会把整个 agent-orchestrator/ 拷进构建上下文，
+# 其中 .env 含真实的 LLM_API_KEY（小米 MiMo）与 PG_PASSWORD；而本镜像已推送到
+# 公开的 Docker Hub（jsyl6/yp-orchestrator），一旦 COPY 进去就是公开泄露。
+# 这个文件是最后一道闸门 —— 即使上下文里混进了 .env，也不会进镜像。
+
+.env
+.env.*
+!.env.example
+
+# 本地虚拟环境与缓存（镜像里由 uv sync 重建，不该拷进去）
+.venv/
+.pytest_cache/
+.ruff_cache/
+__pycache__/
+*.pyc
+
+.git/

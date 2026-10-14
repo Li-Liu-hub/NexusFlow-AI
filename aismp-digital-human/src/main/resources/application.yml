@@ -1,0 +1,74 @@
+server:
+  port: 8126
+
+spring:
+  application:
+    name: aismp-digital-human
+
+  # 服务注册与发现（Nacos 3.2.4）。
+  # 与 aismp-agent 保持一致：本机装了 VMware/WSL，不指定 ip 时 Nacos 会选中
+  # 虚拟网卡 192.168.150.1，导致同机其他服务按服务名调用连不上，故显式用回环地址。
+  cloud:
+    nacos:
+      discovery:
+        server-addr: ${NACOS_ADDR:127.0.0.1:8848}
+        namespace: public
+        register-enabled: true
+        ip: 127.0.0.1
+
+  # 数字员工内核的配置数据落在 terminal_db：
+  #   - a_llm_tool 等「声明式工具定义」表已存在（19 条），直接复用
+  #   - t_terminal / t_location 等业务表同库，查库工具无需跨库
+  datasource:
+    url: jdbc:mysql://127.0.0.1:3306/terminal_db?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai&useSSL=false&allowPublicKeyRetrieval=true
+    # 账号/口令一律由环境变量注入（本机启动脚本 local-init/start-services.sh 已带开发默认值；
+    # 远端由 compose 的 environment 段注入 credentials.env 生成的强凭据）。
+    # ⚠️ 这里曾把 username 硬编码为 root —— 一旦环境变量漏注入，服务会直接用 root 连生产库。
+    username: ${MYSQL_USER:root}
+    password: ${MYSQL_PASSWORD}
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    hikari:
+      maximum-pool-size: 8
+      minimum-idle: 2
+
+  ai:
+    openai:
+      # 与 aismp-agent 保持同一模型端点（小米 MiMo 的 OpenAI 兼容接口）
+      api-key: ${MIMO_API_KEY:}
+      base-url: https://api.xiaomimimo.com
+      chat:
+        options:
+          model: mimo-v2.6-flash
+          temperature: 0.7
+
+  servlet:
+    multipart:
+      # 知识库文档上传：与 KbAdminController.MAX_FILE_BYTES 保持一致（10MB）
+      max-file-size: 10MB
+      max-request-size: 12MB
+
+logging:
+  level:
+    com.aismp.digitalhuman: DEBUG
+
+# 数字员工内核调用外部服务时的出口（如「知识库检索」类工具需要回调 Java agent 的 RAG 能力）。
+# 与编排层一致走网关，复用平台的鉴权与计量链路。
+gateway:
+  base-url: ${GATEWAY_BASE_URL:http://127.0.0.1:8090}
+  access-key: ${GATEWAY_ACCESS_KEY:aismp-console}
+  secret-key: ${GATEWAY_SECRET_KEY:7c1f9a3e5d0b2846af31c7e9b0d45268}
+
+# 平台账本（backend）：2026-10-06 批 A —— 登录令牌/配额归 backend 后，
+# 内核对话入口调 /api/inner/token/check（配额闸门）、出口调 /api/inner/token/charge（用量落账）；
+# 同机直连 7529（内网接口不经网关）。
+backend:
+  base-url: ${BACKEND_BASE_URL:http://127.0.0.1:7529}
+
+# 知识库向量化（agent）：2026-10-06 批 D —— 上传文档的「切分 → embedding → PGVector」
+# 由持有向量库的 aismp-agent 执行，内核调它的 /inner/kb/ingest 与 /inner/kb/delete。
+agent:
+  base-url: ${AGENT_BASE_URL:http://127.0.0.1:8124}
+
+# 知识库上传文件落盘目录（重建索引的源文件）。systemd 部署时用 KB_UPLOAD_DIR 指到持久目录。
+kb:
+  upload-dir: ${KB_UPLOAD_DIR:./kb-uploads}

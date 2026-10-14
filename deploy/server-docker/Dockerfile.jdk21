@@ -1,0 +1,30 @@
+# ============================================================================
+# 统一的 JDK21 应用镜像 —— backend / gateway / agent / digital-human 四个都由它构建
+#
+# 2026-10-10 修正：原 compose 用 Dockerfile.jdk8 构建 backend/gateway 是错的。
+#   实测：aismp-backend/pom.xml 与 aismp-backend/aismp-gateway/pom.xml 都是 <java.version>21</java.version>。
+#   四个应用全部跑在 java-21。
+#
+# 构建（build-and-push.sh 会自动做）：
+#   docker build -f Dockerfile.jdk21 --build-arg JAR=aismp-backend.jar -t <仓库>/ap-backend:<tag> <上下文>
+# ============================================================================
+FROM eclipse-temurin:21-jre
+
+ARG JAR
+
+# JAVA_OPTS 的缺省值是 2026-10-10 实测出的省内存组合：
+#   加 -XX:+UseSerialGC -XX:TieredStopAtLevel=1 后，code cache 从「预留 240MB / 实用 23~38MB」
+#   降到「预留 48MB / 实用 9.7~12.2MB」。各服务在 compose 里用自己的 -Xmx 覆盖。
+ENV TZ=Asia/Shanghai \
+    LANG=C.UTF-8 \
+    JAVA_OPTS="-Xmx256m -XX:+UseSerialGC -XX:TieredStopAtLevel=1"
+
+COPY jars/${JAR} /app/app.jar
+
+RUN useradd -r -u 1001 appuser && chown -R appuser /app
+USER appuser
+WORKDIR /app
+
+# 末尾的 "$@" 用于透传 CMD（如 --server.port=8090）；
+# sh -c '...' -- a b 时 $0="--"、$@="a b"，所以 $@ 拿到的正是 CMD 里的参数
+ENTRYPOINT ["sh", "-c", "exec java -Dfile.encoding=UTF-8 $JAVA_OPTS -jar /app/app.jar \"$@\"", "--"]

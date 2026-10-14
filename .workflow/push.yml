@@ -1,0 +1,69 @@
+version: '1.0'
+name: ci
+displayName: 持续集成（Python 单测/lint + Java 编译）
+triggers:
+  push:
+    branches:
+      include:
+        - main
+stages:
+  - name: stage-python
+    displayName: agent-orchestrator 单测与 lint
+    failFast: true
+    steps:
+      - step: shell@agent
+        name: orchestrator_pytest
+        displayName: Python 单测（pytest）+ 缺陷类 lint（ruff）
+        inputs:
+          - name: shell_commands
+            value: |
+              set -e
+              python3 --version
+              python3 -m pip install --quiet uv ruff
+              cd agent-orchestrator
+              uv sync --frozen
+              uv run pytest tests/ -q
+              # 缺陷类规则：语法错误 / 未定义名（E9,F63,F7,F82）——测试全绿时的冒烟 lint
+              ruff check --select E9,F63,F7,F82 .
+  - name: stage-java
+    displayName: Java 三模块编译
+    failFast: true
+    steps:
+      - step: shell@agent
+        name: java_build
+        displayName: backend(含网关) / agent / digital-human
+        inputs:
+          - name: shell_commands
+            value: |
+              set -e
+              # ---- JDK 21（Temurin，项目编译基线）----
+              if ! java -version 2>&1 | grep -q 'version "21'; then
+                curl -sL -o /tmp/jdk21.tar.gz \
+                  "https://api.adoptium.net/v3/binary/latest/21/ga/linux/x64/jdk/hotspot/normal/eclipse"
+                mkdir -p /opt/jdk21 && tar -xzf /tmp/jdk21.tar.gz -C /opt/jdk21 --strip-components=1
+                export JAVA_HOME=/opt/jdk21
+                export PATH="$JAVA_HOME/bin:$PATH"
+              fi
+              java -version
+              # ---- Maven（缺失时下载）----
+              if ! command -v mvn >/dev/null 2>&1; then
+                curl -sL -o /tmp/mvn.tgz \
+                  "https://archive.apache.org/dist/maven/maven-3/3.9.9/binaries/apache-maven-3.9.9-bin.tar.gz"
+                mkdir -p /opt/maven && tar -xzf /tmp/mvn.tgz -C /opt/maven --strip-components=1
+                export PATH="/opt/maven/bin:$PATH"
+              fi
+              mvn -v
+              # ---- 编译三处 ----
+              # 2026-10-11 架构评审修复：backend 与它的子模块（common/client-sdk/gateway）
+              # 必须从**根聚合工程**起 reactor 构建。
+              # 原因：aismp-backend 是 packaging=jar 的应用（打可执行 jar），
+              #   Maven 规定 aggregator 必须 packaging=pom，所以 backend 自己无法聚合子模块，
+              #   子模块只能挂在根 pom 的 <modules> 下。
+              # 旧命令 `mvn -f aismp-backend/pom.xml compile` 在干净 runner 上必然失败（实测）：
+              #   [ERROR] Could not resolve dependencies ... com.aismp:aismp-common:jar:0.0.1
+              #   （本地仓库没有该 artifact，又不在同一 reactor 内，无法解析）
+              # 新命令用 -pl <模块> -am，让 reactor 先构建被依赖的 common/client-sdk 再构建 backend。
+              mvn -B -q -DskipTests -f pom.xml -pl aismp-backend -am compile
+              mvn -B -q -DskipTests -f aismp-agent/pom.xml package
+              mvn -B -q -DskipTests -f aismp-digital-human/pom.xml package
+              echo "Java build OK"

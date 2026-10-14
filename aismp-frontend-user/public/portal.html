@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta http-equiv="Cache-Control" content="no-store" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>终端 AI 智慧管理平台</title>
+  <link rel="stylesheet" href="./portal.css?v=20261011c" />
+</head>
+<body>
+  <!-- ======== 登录遮罩（未登录时全屏拦截） ======== -->
+  <div class="login-mask" id="loginMask">
+    <div class="login-card">
+      <div class="login-logo">终</div>
+      <h1>终端 AI 智慧管理平台</h1>
+      <div class="sub">登录后使用智能对话与调拨工单闭环</div>
+      <form id="loginForm">
+        <label>账号</label>
+        <input id="loginUser" placeholder="如 portal_user" autocomplete="username" />
+        <label>密码</label>
+        <input id="loginPass" type="password" placeholder="密码" autocomplete="current-password" />
+        <div class="login-err" id="loginErr"></div>
+        <button type="submit" id="loginBtn">登 录</button>
+      </form>
+      <div class="login-hint">
+        <div>演示账号（口令均为 123456，点击可填充）：</div>
+        <div class="hint-list" id="loginHint"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="app">
+    <!-- ======== 左侧栏 ======== -->
+    <aside class="sidebar">
+      <div class="brand"><span class="brand-logo">终</span>终端AI 智慧管理</div>
+      <button class="new-chat" id="newChat"><span class="plus">＋</span>新建对话<span class="k">⌘K</span></button>
+      <nav class="nav" id="nav">
+        <div class="nav-item active" data-view="chat"><span class="nav-ico">💬</span>智能对话</div>
+        <!-- 终端管理（2026-10-07：侧栏不再平铺 13 个子菜单）→ 点击进入二级枢纽页，业务入口在页内（见 portal.js renderBizHub） -->
+        <div class="nav-item" data-view="terminal"><span class="nav-ico">🗂️</span>终端管理</div>
+        <div class="nav-item" data-view="orders"><span class="nav-ico">🔁</span>调拨工单</div>
+      </nav>
+      <div class="recent">
+        <div class="recent-h">最近对话</div>
+        <div class="recent-list" id="recentList"></div>
+      </div>
+      <div class="side-foot">
+        <div class="notif-btn" id="notifBtn">
+          <span>🔔</span>通知<span class="notif-dot" id="notifDot"></span>
+        </div>
+        <div class="notif-panel" id="notifPanel" hidden>
+          <div class="notif-head">消息通知</div>
+          <div id="notifList"></div>
+        </div>
+        <div class="user-card">
+          <div class="avatar" id="userAvatar">—</div>
+          <div>
+            <div class="user-name" id="userName">—</div>
+            <div class="user-role" id="userRole">—</div>
+          </div>
+          <button class="logout" id="logoutBtn">退出</button>
+        </div>
+      </div>
+    </aside>
+
+    <!-- ======== 主区 ======== -->
+    <main class="main">
+      <!-- 智能对话 -->
+      <section class="view" id="viewChat">
+        <div class="chat-scroll" id="chatScroll">
+          <div class="hero">
+            <div class="greet">你好，<span id="greetName">访客</span> 👋</div>
+            <div class="hero-title">有什么我可以帮你的吗？</div>
+            <div class="hero-sub">我可以为你提供补货建议、库存管理、数据分析、风险预警等</div>
+            <div class="chips-row" id="quickChips"></div>
+            <div class="stats">
+              <div class="stat">
+                <div class="stat-ico si-1">🏬</div>
+                <div class="stat-num" id="sTotal">—</div>
+                <div class="stat-label">库存总量</div>
+                <div class="stat-arrow">→</div>
+              </div>
+              <div class="stat">
+                <div class="stat-ico si-2">📦</div>
+                <div class="stat-num" id="sAvail">—</div>
+                <div class="stat-label">可用库存</div>
+                <div class="stat-arrow">→</div>
+              </div>
+              <div class="stat">
+                <div class="stat-ico si-3">⏳</div>
+                <div class="stat-num" id="sAging">—</div>
+                <div class="stat-label">长库龄</div>
+                <div class="stat-arrow">→</div>
+              </div>
+              <div class="stat">
+                <div class="stat-ico si-4">🚚</div>
+                <div class="stat-num" id="sTransit">—</div>
+                <div class="stat-label">在途</div>
+                <div class="stat-arrow">→</div>
+              </div>
+            </div>
+            <div class="stat-note" id="statNote"></div>
+          </div>
+          <div class="msgs" id="msgList"></div>
+        </div>
+        <div class="composer">
+          <!-- 数字员工选择器已移除（2026-10-07）：路由完全由编排层意图识别决定，不再手动选员工 -->
+          <div class="sug-chips" id="sugChips"></div>
+          <div class="composer-inner">
+            <textarea id="chatInput" rows="2" placeholder="请输入您的问题或需求……"></textarea>
+            <div class="composer-bar">
+              <div class="composer-tools"><span>📎</span><span>🖼</span><span>⚙</span><span>🌐</span></div>
+              <button id="sendBtn" class="send-btn" title="发送">➤</button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- 调拨工单 -->
+      <section class="view" id="viewOrders" hidden>
+        <div class="orders-wrap">
+          <div class="orders-title">调拨工单</div>
+          <div class="tabs" id="ordersTabs">
+            <div class="tab active" data-tab="todo">待我处理</div>
+            <div class="tab" data-tab="mine">我发起的</div>
+            <div class="tab" data-tab="all">全部</div>
+          </div>
+          <!-- 筛选条件（2026-10-09）：状态（环节）+ 时间 -->
+          <div class="orders-filter">
+            <label>状态</label>
+            <select id="ofStatus">
+              <option value="">全部状态</option>
+              <option value="APPLIED">待确认出库</option>
+              <option value="OUTBOUND">待确认入库</option>
+              <option value="DONE">已完成</option>
+              <option value="REJECTED">已驳回</option>
+            </select>
+            <label>时间</label>
+            <input type="date" id="ofFrom" title="开始日期" />
+            <span class="sep">至</span>
+            <input type="date" id="ofTo" title="结束日期" />
+            <button class="btn btn-ghost" id="ofReset">重置</button>
+          </div>
+          <div id="ordersDetail"></div>
+          <div id="ordersList"></div>
+        </div>
+      </section>
+
+      <!-- 业务明细页容器（库存管理 / 终端查询 / 报表管理 …） -->
+      <section class="view" id="viewPage" hidden>
+        <!-- 二级页返回条（枢纽页时隐藏）：点它回到「终端管理」入口页 -->
+        <div class="page-back" id="bizBack" hidden><span class="arr">←</span>返回终端管理</div>
+        <div class="page-wrap" id="pageHost"></div>
+      </section>
+    </main>
+  </div>
+
+  <!-- ======== 通用弹窗 ======== -->
+  <div class="modal-mask" id="modalMask" hidden><div class="modal" id="modalBox"></div></div>
+
+  <script src="./portal.js?v=20261012b"></script>
+</body>
+</html>
