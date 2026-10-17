@@ -1,6 +1,8 @@
 package com.aismp.project.auth;
 
 import jakarta.servlet.http.HttpServletRequest;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -40,18 +42,32 @@ public class AuthController {
     public record LoginRequest(String userCode, String password) {
     }
 
+    /**
+     * 登录。
+     *
+     * <p><b>状态码语义（2026-10-17 修正）</b>：原来失败也返回 HTTP 200 + {@code {"error": "..."}}，
+     * 调用方（脚本 / 监控 / 第三方）无法靠状态码判断成败，只能解析 body；这不符合 HTTP 语义。
+     * 现在按失败类型给出真实状态码，**body 形状不变**（仍是 {@code {"error": "..."}}）：
+     * <ul>
+     *   <li>400 —— 缺 userCode / password</li>
+     *   <li>401 —— 账号不存在或密码错误（不区分，避免枚举账号）</li>
+     *   <li>403 —— 账号已停用</li>
+     * </ul>
+     * 前端两个入口（门户 portal.js、管理台 auth.js）都是 {@code if (!resp.ok || data.error)} 判失败，
+     * 所以改状态码不影响展示，仍会显示 body 里的 error 文案。
+     */
     @PostMapping("/login")
-    public Map<String, Object> login(@RequestBody LoginRequest request) {
+    public ResponseEntity<Map<String, Object>> login(@RequestBody LoginRequest request) {
         if (request == null || request.userCode() == null || request.userCode().isBlank()
                 || request.password() == null || request.password().isBlank()) {
-            return Map.of("error", "userCode 和 password 不能为空");
+            return ResponseEntity.badRequest().body(Map.of("error", "userCode 和 password 不能为空"));
         }
         UserPO user = auth.findUser(request.userCode().trim());
         if (user == null || !sha256Hex(request.password()).equalsIgnoreCase(user.getPasswordHash())) {
-            return Map.of("error", "账号或密码错误");
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(Map.of("error", "账号或密码错误"));
         }
         if (!"ACTIVE".equals(user.getStatus())) {
-            return Map.of("error", "账号已停用");
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Map.of("error", "账号已停用"));
         }
         auth.purgeExpired(user.getUserCode());
         String token = auth.issueToken(user.getUserCode(), user.getRole(), TOKEN_HOURS);
@@ -66,7 +82,7 @@ public class AuthController {
         ok.put("warehouseCode", user.getWarehouseCode());
         ok.put("warehouseName", user.getWarehouseName());
         ok.put("expiresInHours", TOKEN_HOURS);
-        return ok;
+        return ResponseEntity.ok(ok);
     }
 
     @GetMapping("/me")
