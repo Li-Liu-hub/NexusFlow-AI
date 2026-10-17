@@ -11,6 +11,10 @@ SELECT * FROM (
   UNION ALL SELECT 'Mock-获取名称(POST)', 'Mock 服务：POST /name/post', '/api/name/post', '{"name":"字符串"}', '{"accessKey":"","nonce":"","timestamp":"","sign":""}', '{"Content-Type":"application/json"}', 1, 'POST', 1, NOW(), NOW(), 0
   UNION ALL SELECT 'Mock-用户信息(POST)', 'Mock 服务：POST /name/user', '/api/name/user', '{"username":"字符串"}', '{"accessKey":"","nonce":"","timestamp":"","sign":""}', '{"Content-Type":"application/json"}', 1, 'POST', 1, NOW(), NOW(), 0
   UNION ALL SELECT 'OA 智能客服(流式)',   'ChatClient + RAG + 工具，SSE 流式', '/oa/chat', '{"message":"","conversationId":""}', '{"accessKey":"","nonce":"","timestamp":"","sign":"","X-User-Id":"","X-Area-Code":""}', '{"Content-Type":"text/event-stream"}', 1, 'POST', 1, NOW(), NOW(), 0
+  -- 2026-10-17 补：数字员工的知识检索工具 searchHandbook 调的就是这个同步端点。
+  --   之前只登记了 /oa/chat（流式），漏了 /oa/chat/sync → 网关按「接口未登记」一律 403，
+  --   症状是知识问答回答「知识手册检索服务暂时不可用（status=403）」，agent 侧连日志都没有。
+  UNION ALL SELECT 'OA RAG 问答(同步)',   '知识检索工具 searchHandbook 的下游，一次性返回完整回答', '/oa/chat/sync', '{"message":"必填","conversationId":"必填"}', '{"accessKey":"","nonce":"","timestamp":"","sign":"","body":""}', '{"Content-Type":"application/json"}', 1, 'POST', 1, NOW(), NOW(), 0
   UNION ALL SELECT 'OA 智能体(SSE)',      'ReAct 四层架构，SseEmitter 逐步推送', '/oa/agent/chat/sse', '{}', '{"accessKey":"","nonce":"","timestamp":"","sign":""}', '{"Content-Type":"text/event-stream"}', 1, 'GET', 1, NOW(), NOW(), 0
   UNION ALL SELECT 'LangGraph 编排(SSE)', 'Python 编排层：supervise→rewrite→executor→critic→respond', '/orchestrator/v1/chat/stream', '{"query":"字符串"}', '{"accessKey":"","nonce":"","timestamp":"","sign":""}', '{"Content-Type":"text/event-stream"}', 1, 'POST', 1, NOW(), NOW(), 0
   UNION ALL SELECT 'MCP SSE 通道',        'MCP Server SSE 建流入口（Bearer token 鉴权）', '/sse', '{}', '{"Authorization":"Bearer <token>"}', '{"Content-Type":"text/event-stream"}', 1, 'GET', 1, NOW(), NOW(), 0
