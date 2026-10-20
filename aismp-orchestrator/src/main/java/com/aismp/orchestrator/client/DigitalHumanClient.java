@@ -122,13 +122,21 @@ public class DigitalHumanClient {
                 throw new DigitalHumanException(
                         "未配置服务账号（ORCH_SVC_USER / ORCH_SVC_PASSWORD），无法换取内核令牌");
             }
-            Map<String, Object> body = restClient.post()
-                    .uri(cfg.getDirectUrl() + "/auth/login")
-                    .contentType(MediaType.APPLICATION_JSON)
-                    .body(Map.of("userCode", cfg.getServiceUser(),
-                            "password", cfg.getServicePassword()))
-                    .retrieve()
-                    .body(Map.class);
+            Map<String, Object> body;
+            try {
+                body = restClient.post()
+                        .uri(cfg.getDirectUrl() + "/auth/login")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .body(Map.of("userCode", cfg.getServiceUser(),
+                                "password", cfg.getServicePassword()))
+                        .retrieve()
+                        .body(Map.class);
+            } catch (RuntimeException e) {
+                // 原版踩过的坑：连不上时裸抛 ConnectError，被外层兜成信息量最低的「编排异常」。
+                // 这里转成领域异常，并把实际目标地址带出来。
+                throw new DigitalHumanException(
+                        "内核不可达（" + cfg.getDirectUrl() + "）: " + e.getMessage());
+            }
             String t = null;
             if (body != null) {
                 if (body.get("token") instanceof String s) {

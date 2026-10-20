@@ -35,7 +35,8 @@ class OrchestratorGraphTest {
         OrchestratorProperties props = new OrchestratorProperties(); // 默认值：无 Key、无服务账号
         RestClient.Builder builder = RestClient.builder();
 
-        LlmRouter router = new LlmRouter(props, builder);
+        // 路由通道用桩子：本测试只关心图拓扑与降级，不碰网络
+        LlmRouter router = new LlmRouter(props, query -> { throw new IllegalStateException("不该被调用"); });
         DigitalHumanClient client = new DigitalHumanClient(props, builder);
 
         return new OrchestratorGraphConfig().orchestratorGraph(
