@@ -14,6 +14,9 @@
     <modules>
         <module>aismp-backend</module>
         <module>aismp-agent</module>
+        <!-- 编排层（Spring AI Alibaba Graph）：替代原 Python agent-orchestrator，
+             监听 8125，网关 /api/orchestrator/** 指向它 -->
+        <module>aismp-orchestrator</module>
         <!--
           2026-10-11 架构评审修复：backend 的子模块此前游离在聚合之外。
           backend 自己是 packaging=jar 的**应用**（要打进可执行 jar），Maven 不允许

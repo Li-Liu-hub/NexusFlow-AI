@@ -1,0 +1,78 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>org.springframework.boot</groupId>
+        <artifactId>spring-boot-starter-parent</artifactId>
+        <version>4.0.7</version>
+        <relativePath/>
+    </parent>
+
+    <groupId>com.aismp</groupId>
+    <artifactId>aismp-orchestrator</artifactId>
+    <version>0.0.1-SNAPSHOT</version>
+    <name>aismp-orchestrator</name>
+    <description>NexusFlow AI - 编排层（Spring AI Alibaba Graph，替代原 Python LangGraph 实现）</description>
+
+    <!--
+      为什么要新模块而不是塞进 aismp-agent：
+        编排层是「只管路由与质检」的独立进程（原 agent-orchestrator 监听 8125），
+        职责边界必须保留 —— 业务实现留在 aismp-agent，装配留在 aismp-digital-human。
+
+      版本矩阵（2026-10-20 实测可解析）：
+        Spring Boot          4.0.7
+        Spring AI            2.0.0-M1
+        spring-ai-alibaba-graph-core  2.0.0-M1.1
+          —— 该版本是 SAA 官方对齐 Spring AI 2.0.0-M1 + Spring Boot 4.0 的里程碑，
+             Maven Central 与阿里云镜像都有；1.1.x 系列只支持 Boot 3.5 / Spring AI 1.1，不能用。
+    -->
+    <properties>
+        <java.version>21</java.version>
+        <spring-ai.version>2.0.0-M1</spring-ai.version>
+        <saa-graph.version>2.0.0-M1.1</saa-graph.version>
+    </properties>
+
+    <dependencyManagement>
+        <dependencies>
+            <dependency>
+                <groupId>org.springframework.ai</groupId>
+                <artifactId>spring-ai-bom</artifactId>
+                <version>${spring-ai.version}</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
+        </dependencies>
+    </dependencyManagement>
+
+    <dependencies>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-web</artifactId>
+        </dependency>
+
+        <!-- 图编排内核：StateGraph / CompiledGraph / 条件边 / 流式输出 -->
+        <dependency>
+            <groupId>com.alibaba.cloud.ai</groupId>
+            <artifactId>spring-ai-alibaba-graph-core</artifactId>
+            <version>${saa-graph.version}</version>
+        </dependency>
+
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+    </dependencies>
+
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>org.springframework.boot</groupId>
+                <artifactId>spring-boot-maven-plugin</artifactId>
+            </plugin>
+        </plugins>
+    </build>
+</project>
