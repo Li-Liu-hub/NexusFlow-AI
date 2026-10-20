@@ -1,12 +1,25 @@
 server:
   port: 8125
+  # 内存与线程都按「小机器上只做路由」来配：这台服务器 3.6G / 4C，
+  # 编排层是短请求（一次 SSE 几秒），不需要 200 线程的默认配置。
+  tomcat:
+    threads:
+      max: 20
+      min-spare: 4
+    max-connections: 100
+  compression:
+    enabled: false
 
 spring:
   application:
     name: aismp-orchestrator
+  main:
+    banner-mode: off
+    # 懒加载：容器起来时不把所有 Bean 都实例化，首请求再装配。
+    # 省的是启动期峰值内存（这台机器 swap 已经很紧张），代价是首个请求慢几十毫秒。
+    lazy-initialization: true
 
-# 编排层配置（对应原 Python 版 config.py）
-# 敏感值一律走环境变量，仓库里只有空默认值 —— 与全项目「密钥不进仓库」约定一致
+# 编排层配置：敏感值一律走环境变量，仓库里只有空默认值
 orchestrator:
   llm:
     base-url: ${LLM_BASE_URL:https://api.z.ai/api/coding/paas/v4}

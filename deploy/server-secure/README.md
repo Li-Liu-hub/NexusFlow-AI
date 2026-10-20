@@ -61,7 +61,7 @@
          → 04-redis.sh → 05-rabbitmq.sh → 06-nacos.sh
 
 第 2 步  生成强密码（在本机跑）
-         python deploy/server-secure/generate-credentials.py
+         # 凭据文件由部署者手工写入（生成脚本已移除）：credentials.env 需 600 权限
          → 产出 credentials.env（已被 .gitignore 忽略）
 
 第 3 步  上传并执行中间件加固
@@ -126,7 +126,7 @@
 | `90-harden.sh` | **中间件层加固**：MySQL/PG/Redis/RabbitMQ/Nacos 的密码与鉴权 |
 | `95-bind-localhost.sh` | **监听收口**：让中间件只监听 `127.0.0.1`（深度防御第二层） |
 | `30-init-data.sh` | **数据初始化**：建 api_db + 平台元数据表 + 账号 + 接口登记 |
-| `generate-credentials.py` | 在本机生成强密码到 `credentials.env` |
+| `credentials.env` | 部署者手工维护的强密码表（600 权限，**不进 git**） |
 | `credentials.env` | **不入 git**，由上面脚本生成 |
 
 **分工原则**：`10` 管操作系统 → `01..06` 装中间件 → `90` 管密码与鉴权 → `95` 管监听地址 → `30` 灌数据。

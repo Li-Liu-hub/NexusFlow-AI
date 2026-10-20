@@ -1,8 +1,11 @@
 package com.aismp.orchestrator.graph;
 
+import com.aismp.orchestrator.client.DigitalHumanClient;
+import com.aismp.orchestrator.config.OrchestratorProperties;
 import com.aismp.orchestrator.graph.nodes.KbNode;
 import com.aismp.orchestrator.graph.nodes.RespondNode;
 import com.aismp.orchestrator.graph.nodes.SuperviseNode;
+import com.aismp.orchestrator.llm.LlmRouter;
 import com.alibaba.cloud.ai.graph.CompileConfig;
 import com.alibaba.cloud.ai.graph.CompiledGraph;
 import com.alibaba.cloud.ai.graph.KeyStrategyFactory;
@@ -34,6 +37,25 @@ import static com.alibaba.cloud.ai.graph.action.AsyncNodeAction.node_async;
  */
 @Configuration
 public class OrchestratorGraphConfig {
+
+    // 三个节点必须是 Spring Bean —— 图装配方法按参数注入它们。
+    // 教训：这些类一直没被注册成 Bean，而单测是手工 new 的，所以"编译过 + 单测绿"
+    // 掩盖了容器启动不了的洞，直到真正部署才炸（/health 500）。
+    // 现在由 OrchestratorContextTest 兜住：上下文起不来，测试就红。
+    @Bean
+    public SuperviseNode superviseNode(LlmRouter router) {
+        return new SuperviseNode(router);
+    }
+
+    @Bean
+    public KbNode kbNode(DigitalHumanClient client, OrchestratorProperties properties) {
+        return new KbNode(client, properties);
+    }
+
+    @Bean
+    public RespondNode respondNode() {
+        return new RespondNode();
+    }
 
     @Bean
     public CompiledGraph orchestratorGraph(KeyStrategyFactory keyStrategyFactory,

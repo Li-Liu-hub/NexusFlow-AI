@@ -80,7 +80,7 @@ if [ "${1:-}" = "--no-db" ]; then
   note_skip "db: multi-tenant schema verification (--no-db)"
 else
   run_step "db: multi-tenant schema verification" \
-    python db/mysql/verify-tenant-schema.py
+    bash db/mysql/verify-tenant-schema.sh
 fi
 
 # --- 3/4. Frontends ---------------------------------------------------------

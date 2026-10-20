@@ -190,12 +190,12 @@ bash scripts/test-all.sh --no-db  # 跳过需要 MySQL 的那步
 | 步骤 | 覆盖 | 结果 |
 |---|---|---|
 | `aismp-orchestrator` | 图拓扑 / 路由解析与降级 / 内核客户端 / SSE 五帧 | **32 passed** |
-| `db/mysql/verify-tenant-schema.py` | 迁移幂等 + 结构 + 种子 + 中文 UTF-8 | **11 项** |
+| `db/mysql/verify-tenant-schema.sh` | 迁移幂等 + 结构 + 种子 + 中文 UTF-8 | **16 项** |
 | `aismp-frontend-admin` | `tsc --noEmit` + 登录态 / 请求封装 | **21 passed** |
 | `aismp-frontend-user` | `tsc --noEmit` | 通过 |
 
-需要部署环境的验收（不在门禁内）：`deploy/acceptance.py` 全链路 50/50、
-`local-init/*-e2e.py` 调拨闭环 24/24 与告警闭环 18/18、画布链路 9/9。
+需要部署环境才能做的验收（不在门禁内，按「快速开始」的步骤手工执行）：
+全链路 50 项、调拨闭环 24 项、告警 → 建议 → 工单闭环 18 项、画布链路 9 项。
 
 ---
 
