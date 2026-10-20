@@ -16,7 +16,15 @@ export const DEFAULT_USER = 'web_user';
 async function request<T = any>(path: string, options?: RequestInit): Promise<T> {
   const resp = await fetch(BASE + path, options);
   if (!resp.ok) {
-    throw new Error(`HTTP ${resp.status} ${resp.statusText}`);
+    // 后端把人话放在 body.error 里（例如「会话不存在」），别被 "HTTP 404" 盖掉
+    let msg = `HTTP ${resp.status} ${resp.statusText}`;
+    try {
+      const err = (await resp.json())?.error;
+      if (err) msg = err;
+    } catch {
+      // 保留默认消息
+    }
+    throw new Error(msg);
   }
   const data = await resp.json();
   if (data && data.error) {
