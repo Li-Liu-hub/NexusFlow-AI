@@ -1,20 +1,21 @@
 import { useEffect, useState } from 'react';
 import { Button, Layout, Menu, Tag } from 'antd';
-import AgentPage from './pages/AgentPage.jsx';
-import SkillPage from './pages/SkillPage.jsx';
-import KbPage from './pages/KbPage.jsx';
-import McpPage from './pages/McpPage.jsx';
-import ToolPage from './pages/ToolPage.jsx';
-import RuntimePage from './pages/RuntimePage.jsx';
-import AuditPage from './pages/AuditPage.jsx';
-import TokenPage from './pages/TokenPage.jsx';
-import CanvasPage from './pages/CanvasPage.jsx';
-import LoginGate from './LoginGate.jsx';
-import { getAuth, logout } from './auth.js';
+import AgentPage from './pages/AgentPage';
+import SkillPage from './pages/SkillPage';
+import KbPage from './pages/KbPage';
+import McpPage from './pages/McpPage';
+import ToolPage from './pages/ToolPage';
+import RuntimePage from './pages/RuntimePage';
+import AuditPage from './pages/AuditPage';
+import TokenPage from './pages/TokenPage';
+import CanvasPage from './pages/CanvasPage';
+import LoginGate from './LoginGate';
+import { getAuth, logout } from './auth';
+import type { AuthUser, MenuEntry } from './types';
 
 const { Sider, Content, Header } = Layout;
 
-const MENU = [
+const MENU: MenuEntry[] = [
   { key: 'agent', label: '数字员工配置' },
   { key: 'skill', label: '技能管理' },
   { key: 'kb', label: '知识库管理' },
@@ -28,7 +29,7 @@ const MENU = [
 
 export default function App() {
   const [page, setPage] = useState('agent');
-  const [auth, setAuth] = useState(getAuth());
+  const [auth, setAuth] = useState<AuthUser | null>(getAuth());
 
   // token 失效（401）时统一跳回登录门
   useEffect(() => {

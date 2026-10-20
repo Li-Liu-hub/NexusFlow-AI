@@ -1,25 +1,30 @@
 import { useState } from 'react';
 import { Button, Form, Input, message } from 'antd';
-import { login, isDemoAccount } from './auth.js';
+import { login, isDemoAccount } from './auth';
+import type { AuthUser, LoginValues } from './types';
 
 /** 演示账号（口令均为 123456，点击可填充）—— 与用户平台 portal 保持一致 */
-const DEMO_ACCOUNTS = [['admin', '管理员']];
+const DEMO_ACCOUNTS: Array<[string, string]> = [['admin', '管理员']];
 
 /**
  * 管理台登录门：未登录时整页只渲染这一张卡。
  * 后端校验角色 —— 非 ADMIN 账号即使密码正确也进不来。
  * 2026-10-11：视觉对齐用户端 portal 登录页（紫渐变底 + 圆 Logo + 白卡）。
  */
-export default function LoginGate({ onLogin }) {
+interface LoginGateProps {
+  onLogin: (auth: AuthUser) => void;
+}
+
+export default function LoginGate({ onLogin }: LoginGateProps) {
   const [form] = Form.useForm();
   const [loading, setLoading] = useState(false);
 
   /** 点击演示账号胶囊 → 回填账号密码 */
-  const fillDemo = (userCode) => {
+  const fillDemo = (userCode: string) => {
     form.setFieldsValue({ userCode, password: '123456' });
   };
 
-  const onFinish = async (values) => {
+  const onFinish = async (values: LoginValues) => {
     setLoading(true);
     try {
       const auth = await login(values.userCode, values.password);
@@ -27,7 +32,7 @@ export default function LoginGate({ onLogin }) {
       if (isDemoAccount()) message.info('当前为演示账号，仅支持查看，增删改操作会被拦截', 5);
       onLogin(auth);
     } catch (e) {
-      message.error(e.message);
+      message.error((e as Error).message);
     } finally {
       setLoading(false);
     }
