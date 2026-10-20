@@ -59,21 +59,22 @@ DONE 已完成 —— 库存此时才真正 B 减 A 增
         ├─► /api/agent/**                            → aismp-digital-human :8126
         │      数字员工内核：装配（角色/技能/知识库/工具）+ ReAct
         │
-        └─► /api/orchestrator/**                     → agent-orchestrator :8125
-               Python FastAPI + LangGraph 编排（只管路由与质检）
+        └─► /api/orchestrator/**                     → aismp-orchestrator :8125
+               Spring AI Alibaba Graph 编排（只管路由与质检）
                三条业务路线，见下表
 ```
 
-**编排层三条业务路线**（`agent-orchestrator/graph.py`，1499 行）：
+**编排层**（`aismp-orchestrator`，Spring AI Alibaba Graph 装配在 `graph/OrchestratorGraphConfig.java`）：
 
-| 路线 | 节点序列 | 说明 |
+| 路线 | 节点序列 | 状态 |
 |---|---|---|
-| `replenish` 补仓调拨 | `supervise → fetch → algorithm → report → verify_numbers → critic → respond` | 含**回炉环**（critic 不合格回流重算） |
-| `chart` 图表 | `supervise → chart_plan → chart_build → respond` | LLM 选维度 + 样式，数据取接口原值 |
-| `kb` 知识问答 | `supervise → digital_human → respond` | 转发数字员工内核 |
+| `kb` 知识问答 | `supervise → kb → respond` | ✅ 已迁到 Java |
+| `replenish` 补仓调拨 | `supervise → fetch → algorithm → report → verify_numbers → critic → respond` | 待迁（含**回炉环**：critic 不合格回流重算） |
+| `chart` 图表 | `supervise → chart_plan → chart_build → respond` | 待迁 |
 
-**画布编排**（增量能力）：编排逻辑不写死，由管理端画布发布的图驱动（`GRAPH_SOURCE=dsl`），
-支持版本固化与回滚、按会话粘版本。
+同一份状态契约（`graph/StateKeys.java`）与原 Python 版**逐字对齐**，SSE 五种帧
+（`start / progress / agent_step / error / result`）保持不变，所以前端与网关不用改。
+未迁完的路线由 `RespondNode` 明确回「该路线尚未迁移」，不会用空回答冒充正常结果。
 
 ---
 
@@ -81,13 +82,13 @@ DONE 已完成 —— 库存此时才真正 B 减 A 增
 
 **1. 数字红线双闸门** —— LLM 会说错数字，所以数字不进 LLM 的嘴。
 
-- `agent-orchestrator/tools/algorithms.py`：补货量、缺口、周转天数全由代码算，LLM 只决定「跑哪个算法、传什么参数」。
-- `graph.py` 的 `verify_numbers` 节点：做代码 diff 闸门，卡片上的数字必须与算法输出逐项相等，不一致直接回炉重算。
-- `canvas/loader.py`：发布期强制护栏——图里 `report` 节点不得直连 `respond`，绕开闸门直接 422 拒绝发布。
+- 补货量、缺口、周转天数全由代码算，LLM 只决定「跑哪个算法、传什么参数」（Python 版在
+  `tools/algorithms.py`，迁 Java 时落在 `graph/nodes`）。
+- `verify_numbers`：代码 diff 闸门，卡片上的数字必须与算法输出逐项相等，不一致直接回炉重算。
+- 画布发布期的强制护栏：图里 `report` 节点不得直连 `respond`，绕开闸门直接 422 拒绝发布。
 
-**2. 画布 DSL → LangGraph，不写 eval**。`loader.py` 全文件只有两个循环，节点定义白名单化；
-图里的环靠条件边回指 + `MAX_REVISIONS=2` + `recursion_limit=20` 三重收口，
-`tests/test_canvas_loader.py` 用拓扑等价性断言证明「画布上的图」和「代码里的图」一致。
+**2. 图构建不写 eval**。节点定义白名单化，环靠条件边回指 + 回炉上限 + `recursionLimit=20` 三重收口；
+`OrchestratorGraphTest` 用拓扑断言（`supervise → kb → respond`）证明「代码里的图」没被改坏。
 
 **3. 网关身份「先剥离再注入」**。客户端传来的身份头一律当伪造剥掉，再由网关按 AK/SK 签名结果注入真实身份，
 然后才匹配 `interface_info`；签名带 nonce + Redis SETNX 防重放，计量异步走 RabbitMQ 落库。
@@ -108,11 +109,11 @@ API 调用工具按身份校验接口白名单，越权直接拒绝。
 | `aismp-gateway` | Spring Cloud Gateway（WebFlux） | 8090 | 鉴权 + 限流 + 计量（HTTP + Nacos lb，无 Dubbo） |
 | `aismp-agent` | **Spring Boot 4.0.7 · JDK 21** · Spring AI | 8124 | 终端业务 + RAG + 工具 + 调拨状态机 |
 | `aismp-digital-human` | **Spring Boot 4.0.7 · JDK 21** | 8126 | 数字员工内核（装配 + ReAct） |
-| `agent-orchestrator` | Python 3.12 · LangGraph · FastAPI | 8125 | 编排层（路由 / 质检 / 画布 DSL 加载） |
-| `aismp-frontend-user` | Vite（原生 JS 门户） | — | 业务门户（对话 / 库存 / 工单 / 通知） |
+| `aismp-orchestrator` | **Spring Boot 4.0.7 · JDK 21** · Spring AI Alibaba Graph 2.0.0-M1.1 | 8125 | 编排层（路由 / 质检 / 图装配） |
+| `aismp-frontend-user` | TypeScript · Vite（门户为原生 TS，构建成 IIFE） | — | 业务门户（对话 / 库存 / 工单 / 通知） |
 | `aismp-frontend-admin` | React 18 · Vite · reactflow 11 | — | 管理台（Agent / 技能 / KB / MCP / 画布 / 配额 / 审计） |
 
-> `aismp-frontend-master` 是早期 Umi 工程，**已非主战场**，保留仅作参考。
+> 前端两个工程全部是 TypeScript；早期 Umi 工程 `aismp-frontend-master` 已移除。
 
 **基础设施**：
 
@@ -185,8 +186,14 @@ setx MYSQL_APP_PW "<MySQL 应用账号口令>"
 setx REDIS_PW "<Redis 口令>"
 ```
 
-**编排层**：`cp agent-orchestrator/.env.example agent-orchestrator/.env` 后填值
-（网关三元组 / LLM 三项 / `GRAPH_SOURCE=dsl`）。
+**编排层**（`aismp-orchestrator`）走环境变量，配置项见 `config/OrchestratorProperties`：
+
+```bash
+export LLM_API_KEY="<MiMo 对话模型 Key>"      # 意图路由用，温度固定 0
+export ORCH_SVC_USER="svc_orchestrator"       # 换内核令牌的服务账号
+export ORCH_SVC_PASSWORD="<服务账号口令>"
+export DIGITAL_HUMAN_DIRECT_URL="http://127.0.0.1:8126"
+```
 
 ---
 
@@ -197,12 +204,15 @@ NexusFlow-AI/
 ├── aismp-backend/           # 管理后端（含 aismp-gateway / aismp-common / aismp-client-sdk）
 ├── aismp-agent/             # 终端业务 + RAG
 ├── aismp-digital-human/     # 数字员工内核
-├── agent-orchestrator/      # LangGraph 编排层
-│   ├── graph.py             # 三条业务路线
-│   ├── canvas/              # 画布 DSL → StateGraph
-│   ├── tools/algorithms.py  # 确定性算法（数字红线所在）
-│   └── tests/               # 单测
-├── aismp-frontend-user/     # 业务门户
+├── aismp-orchestrator/      # 编排层（Spring AI Alibaba Graph）
+│   ├── graph/               # StateGraph 装配 + 节点
+│   │   ├── OrchestratorGraphConfig.java  # 拓扑
+│   │   ├── StateKeys.java               # 状态契约（与前端契约对齐）
+│   │   └── nodes/                       # supervise / kb / respond
+│   ├── llm/                 # 意图路由（HTTP 通道与解析规则分离，便于脱网测）
+│   ├── client/              # 数字员工内核客户端（令牌缓存 + 401 重登）
+│   └── src/test/            # 单测（拓扑 / 路由 / 客户端 / SSE 帧）
+├── aismp-frontend-user/     # 业务门户（src/portal/portal.ts → 构建出 public/portal.js）
 ├── aismp-frontend-admin/    # 管理台
 ├── db/                      # 建库 SQL（结构 + 配置种子，无业务数据）
 │   ├── mysql/               # api_db
@@ -216,7 +226,8 @@ NexusFlow-AI/
     ├── push-dockerhub.sh    # 推镜像到 Docker Hub
     ├── deploy.sh            # 部署到服务器
     ├── push-gitee.sh        # 推送代码到 Gitee
-    └── start-all.sh         # 本机一键启动
+    ├── start-all.sh         # 本机一键启动
+    └── test-all.sh          # ★ 测试门禁（Java + DB + 两端 TS）
 ```
 
 ---
@@ -234,15 +245,23 @@ NexusFlow-AI/
 
 ## 八、验收与测试
 
-| 脚本 | 覆盖 | 结果 |
+**一条命令跑完自动化测试**（不启动任何服务）：
+
+```bash
+bash scripts/test-all.sh          # 6 步，失败非零退出
+bash scripts/test-all.sh --no-db  # 跳过需要 MySQL 的那步
+```
+
+| 步骤 | 覆盖 | 结果 |
 |---|---|---|
-| `deploy/acceptance.py` | 全链路端到端 | **50/50** |
-| `local-init/transfer-flow-e2e.py` | 调拨闭环 | **24/24** |
-| `local-init/stock-alert-closed-loop-e2e.py` | 告警 → 建议 → 工单闭环 | **18/18** |
-| `deploy/server-secure/_r12/_r14/_r15-*.py` | 门户公网 / 写入授权 / 数据范围 | **12/12 · 6/6 · 15/15** |
-| `deploy/server-docker/canvas_link_test2.py` | 画布编排拓扑级实验 | **9/9** |
-| `agent-orchestrator/tests/` | 编排层单测 | **117 passed** |
-| 知识库评估（20 题 × 3 遍） | 关键词命中 + LLM 判官 | **92.9% / 90.0%** |
+| `aismp-orchestrator` 单测 | 图拓扑 / 路由解析与降级 / 内核客户端 / SSE 五帧契约 | **32 passed** |
+| `db/mysql/verify-tenant-schema.py` | 多租户迁移幂等 + 结构 + 种子 + 中文 UTF-8 | **11 项全过** |
+| `aismp-frontend-admin` | `tsc --noEmit` + 登录态/请求封装单测 | **21 passed** |
+| `aismp-frontend-user` | `tsc --noEmit` + 会话接口单测 | **7 passed** |
+
+端到端与真机验收（需要部署环境，不在门禁内）：
+`deploy/acceptance.py` 全链路 50/50、`local-init/*-e2e.py` 调拨闭环 24/24 与告警闭环 18/18、
+`deploy/server-docker/canvas_link_test2.py` 画布 9/9、知识库评估 20 题 × 3 遍 92.9% / 90.0%。
 
 ---
 

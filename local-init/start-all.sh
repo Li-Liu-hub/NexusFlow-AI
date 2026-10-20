@@ -48,9 +48,9 @@ echo "[6/8] aismp-agent"
 netstat -ano | grep -qE ":8124 .*LISTENING" || { nohup "$HERE/start-services.sh" agent >"$LOGS/agent.log" 2>&1 & }
 wait_port 8124 aismp-agent 90
 
-echo "[7/8] agent-orchestrator"
+echo "[7/8] aismp-orchestrator (Spring AI Alibaba Graph)"
 netstat -ano | grep -qE ":8125 .*LISTENING" || { nohup "$HERE/start-orchestrator.sh" >"$LOGS/orchestrator.log" 2>&1 & }
-wait_port 8125 agent-orchestrator 60
+wait_port 8125 aismp-orchestrator 60
 
 echo "[8/8] 端到端验证"
 cd "$HERE" && node e2e-test.mjs

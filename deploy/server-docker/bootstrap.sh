@@ -35,7 +35,7 @@ MISS=""
 for j in aismp-backend.jar aismp-gateway.jar aismp-agent.jar aismp-digital-human.jar; do
   [ -f "jars/$j" ] || MISS="$MISS $j"
 done
-[ -d orchestrator-image/agent-orchestrator ] || MISS="$MISS agent-orchestrator/"
+[ -f jars/aismp-orchestrator.jar ] || MISS="$MISS jars/aismp-orchestrator.jar"
 [ -d web/portal ] || MISS="$MISS web/portal/"
 [ -f .env ] || true
 if [ -n "$MISS" ]; then

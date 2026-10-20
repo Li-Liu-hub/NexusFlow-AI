@@ -269,34 +269,24 @@ services:
 
   orchestrator:
     <<: *app-defaults
+    # 2026-10-20：Python/LangGraph 版已换成 Java（Spring AI Alibaba Graph），镜像名沿用，compose 无需改名
     image: ${REGISTRY}/ap-orchestrator:${TAG}
     container_name: ap-orchestrator
     environment:
-      # 编排层读 PG_HOST/PG_PORT/PG_USER/PG_PASSWORD/PG_DATABASE（pydantic Settings）
-      PG_HOST: postgres
-      PG_PORT: "5432"
-      PG_USER: my_user
-      PG_PASSWORD: ${PG_PW}
-      PG_DATABASE: terminal_kb
-      GATEWAY_BASE_URL: http://gateway:8090
-      GATEWAY_ACCESS_KEY: ${GW_ACCESS_KEY}
-      GATEWAY_SECRET_KEY: ${GW_SECRET_KEY}
+      # 配置项对应 aismp-orchestrator 的 OrchestratorProperties（orchestrator.*）
       LLM_API_KEY: ${MIMO_API_KEY}
       LLM_BASE_URL: https://api.xiaomimimo.com/v1
       LLM_MODEL: mimo-v2.6-flash
-      ORCH_HOST: 0.0.0.0
-      ORCH_PORT: "8125"
-      # ★ 2026-10-10 容器化修复：编排层有两处写死 127.0.0.1（原生部署时"同机"成立，
-      #   容器里 127.0.0.1 = 编排层自己的回环 → Connection refused）。
-      #   ① tools/digital_human_api.py:_service_token() 用 DIGITAL_HUMAN_DIRECT_URL 登录内核拿服务令牌
-      #      —— 注意 DIGITAL_HUMAN_VIA_GATEWAY=True 管不到它（登录无条件直连）；
-      #   ② llm.py:_CHARGE_URL 把 LLM 用量旁路落账到 backend（/inner/** 不经网关）。
+      # 容器里 127.0.0.1 是本容器回环，必须写服务名
       DIGITAL_HUMAN_DIRECT_URL: http://digital-human:8126
-      CHARGE_URL: http://backend:7529/api/inner/token/charge
-    mem_limit: 192m
+      # 服务账号用于 /auth/login 换内核令牌（口令只从 .env 注入，不进仓库）
+      ORCH_SVC_USER: svc_orchestrator
+      ORCH_SVC_PASSWORD: ${ORCH_SVC_PASSWORD}
+    # JVM 版内存边界：原 Python 版 192m（含 glibc arena 碎片），Java 不能沿用
+    mem_limit: 384m
     depends_on:
-      postgres: { condition: service_healthy }
       gateway: { condition: service_started }
+      digital-human: { condition: service_started }
     networks:
       apnet: { ipv4_address: 172.28.0.15 }
 

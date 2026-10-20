@@ -102,7 +102,7 @@ sudo systemctl restart nacos
 printf '  %-22s %s\n' nacos "$(systemctl is-active nacos)"
 sleep 45
 
-for u in nginx aismp-backend aismp-gateway aismp-agent aismp-digital-human agent-orchestrator; do
+for u in nginx aismp-backend aismp-gateway aismp-agent aismp-digital-human aismp-orchestrator; do
   sudo systemctl enable "$u" >/dev/null 2>&1
   sudo systemctl restart "$u"
   printf '  %-22s %s\n' "$u" "$(systemctl is-active "$u")"

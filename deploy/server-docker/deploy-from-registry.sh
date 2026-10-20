@@ -19,7 +19,7 @@ set -uo pipefail
 
 HERE="$(cd "$(dirname "$0")" && pwd)"
 ENVFILE="/opt/agent-platform-secure/compose.env"
-APP_UNITS="aismp-gateway aismp-backend aismp-digital-human aismp-agent agent-orchestrator"
+APP_UNITS="aismp-gateway aismp-backend aismp-digital-human aismp-agent aismp-orchestrator"
 MID_UNITS="nginx nacos rabbitmq-server redis-server postgresql@18-main mysql"
 DECLARE_PORTS="8090 7529 8126 8124 8125"
 

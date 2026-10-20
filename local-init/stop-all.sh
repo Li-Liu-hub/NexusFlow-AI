@@ -8,7 +8,7 @@ kill_port() { # $1=端口 $2=名称
     taskkill //F //PID "$pid" >/dev/null 2>&1 && echo "  ✓ 已停止 $2 ($1, PID $pid)"
   done
 }
-kill_port 8125 agent-orchestrator
+kill_port 8125 aismp-orchestrator
 kill_port 8124 aismp-agent
 kill_port 8123 aismp-interface
 kill_port 8090 aismp-gateway

@@ -136,20 +136,25 @@ build_java aismp-backend       backend   backend
 build_java aismp-digital-human kernel    digital-human
 build_java aismp-agent         agent     agent
 
-# ---- 编排层（源码构建，上下文必须有 agent-orchestrator/）----
-ORCH_CTX="$HERE/orchestrator-image"
-if [ -f "$ORCH_CTX/agent-orchestrator/pyproject.toml" ] && [ -f "$ORCH_CTX/agent-orchestrator/uv.lock" ]; then
+# ---- 编排层（Java · Spring AI Alibaba Graph）----
+# 2026-10-20：原 Python/LangGraph 镜像已移除，改为和其他服务一样的 jar 镜像。
+# 镜像名保持 ap-orchestrator 不变 —— compose 与网关路由都不用跟着改。
+if [ -f "$JARS_DIR/aismp-orchestrator.jar" ]; then
   img="$REGISTRY/ap-orchestrator:$TAG"
-  log "构建 $img   ← $ORCH_CTX（uv sync 首次较慢，约 1~3 分钟）"
-  docker build -f "$ORCH_CTX/Dockerfile" -t "$img" "$ORCH_CTX" >/dev/null
+  ctx="$(mktemp -d)"
+  mkdir -p "$ctx/jars"
+  cp "$JARS_DIR/aismp-orchestrator.jar" "$ctx/jars/app.jar"
+  cp "$HERE/Dockerfile.jdk21" "$ctx/Dockerfile.jdk21"
+  log "构建 $img   ← $JARS_DIR/aismp-orchestrator.jar"
+  docker build -f "$ctx/Dockerfile.jdk21" --build-arg "JAR=app.jar" -t "$img" "$ctx" >/dev/null
   ok "已构建 $img"
+  rm -rf "$ctx" 2>/dev/null || true
   IMAGES+=("$img")
   if [ "$PUSH" = "1" ]; then push_image "$img"; fi
 else
   echo
-  echo "跳过编排层：$ORCH_CTX/agent-orchestrator/ 缺 pyproject.toml 或 uv.lock"
-  echo "  服务器上可临时生成上下文："
-  echo "    mkdir -p $ORCH_CTX/agent-orchestrator && cp -r /opt/app/orchestrator/. <...>（见方案文档「编排层」一节）"
+  echo "跳过编排层：缺 $JARS_DIR/aismp-orchestrator.jar"
+  echo "  先执行：bash deploy/server-docker/collect-artifacts.sh"
 fi
 
 if [ "$PUSH" = "1" ]; then

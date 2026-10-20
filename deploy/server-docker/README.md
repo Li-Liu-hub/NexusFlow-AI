@@ -11,10 +11,8 @@
 server-docker/
 ├── docker-compose.full.yml      # ★ 唯一的 compose 定义（11 个服务）
 ├── .env.example                 # 凭据模板 → 复制为 .env 填写（chmod 600）
-├── Dockerfile.jdk21             # backend / gateway / agent / digital-human 镜像
-├── orchestrator-image/          # 编排层镜像（含源码与 Dockerfile）
-│   ├── Dockerfile
-│   └── .dockerignore
+├── Dockerfile.jdk21             # 五个 Java 服务共用（backend / gateway / agent / digital-human / orchestrator）
+│                                # 编排层原 Python 镜像（orchestrator-image/）已于 2026-10-20 移除
 ├── nginx/nginx.conf             # 唯一对外端口 80（门户 + 管理台 + /api 反代）
 ├── init/
 │   ├── mysql-init/01-init.sh    # 容器首次初始化（建库 / 账号 / 授权）
@@ -111,7 +109,7 @@ curl -I http://localhost/admin/  # 管理台
 | agent / digital-human | 480m ×2 | Xmx360m |
 | backend | 384m | Xmx192m |
 | gateway | 340m | Xmx256m |
-| postgres / rabbitmq / orchestrator | 256m / 192m / 160m | |
+| postgres / rabbitmq / orchestrator | 256m / 192m / 384m | 编排层是 JVM，堆 256m + 元空间余量 |
 | redis / nginx | 96m / 32m | |
 | **合计** | **~3.2G** | 留 ~400M 给系统，6G swap 兜底 |
 

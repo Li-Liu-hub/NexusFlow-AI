@@ -56,7 +56,7 @@ if [ "$MODE" = "status" ]; then
   info "服务端口状态"
   for pair in "3306:MySQL" "5432:PostgreSQL" "6379:Redis" "5672:RabbitMQ" \
               "8848:Nacos" "8099:bge-m3" "7529:aismp-backend" "8090:aismp-gateway" \
-              "8124:aismp-agent" "8126:aismp-digital-human" "8125:agent-orchestrator"; do
+              "8124:aismp-agent" "8126:aismp-digital-human" "8125:aismp-orchestrator"; do
     p="${pair%%:*}"; n="${pair##*:}"
     if listen "$p"; then ok "$n ($p)"; else warn "$n ($p) 未监听"; fi
   done
@@ -144,9 +144,9 @@ wait_port 8124 aismp-agent 120
 start_if_down 8126 aismp-digital-human digital-human "$INIT/start-services.sh" digital-human
 wait_port 8126 aismp-digital-human 120
 
-# 7) agent-orchestrator（编排层）
-start_if_down 8125 agent-orchestrator orchestrator "$INIT/start-orchestrator.sh"
-wait_port 8125 agent-orchestrator 90
+# 7) aismp-orchestrator（编排层 · Java）
+start_if_down 8125 aismp-orchestrator orchestrator "$INIT/start-orchestrator.sh"
+wait_port 8125 aismp-orchestrator 90
 
 echo ""
 info "═══ 汇总 ═══"

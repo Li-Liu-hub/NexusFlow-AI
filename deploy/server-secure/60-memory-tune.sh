@@ -77,7 +77,7 @@ if [ $DO_S1 -eq 1 ]; then
 
 log "1) Python 编排层：MALLOC_ARENA_MAX=2   预期 -150~250MB"
 echo "    说明：治 glibc malloc arena 碎片（实测 3 线程却有 6 个 40~87MB 匿名映射）"
-D=/etc/systemd/system/agent-orchestrator.service.d
+D=/etc/systemd/system/aismp-orchestrator.service.d
 if [ "$DRY" -eq 1 ]; then
   printf '    [dry-run] mkdir -p %s\n    [dry-run] 写入 %s/10-memory.conf:\n              [Service]\n              Environment=MALLOC_ARENA_MAX=2\n              Environment=MALLOC_TRIM_THRESHOLD_=65536\n' "$D" "$D"
 elif grep -qs MALLOC_ARENA_MAX "$D/10-memory.conf" 2>/dev/null; then
@@ -139,7 +139,7 @@ if [ "$DRY" -eq 1 ]; then
   printf '    [dry-run] systemctl daemon-reload\n'
   printf '    [dry-run] systemctl restart nacos ；等待 8848 就绪\n'
   printf '    [dry-run] systemctl restart aismp-agent aismp-digital-human aismp-backend aismp-gateway\n'
-  printf '    [dry-run] systemctl restart agent-orchestrator\n'
+  printf '    [dry-run] systemctl restart aismp-orchestrator\n'
 else
   systemctl daemon-reload
   echo "    -- 重启 Nacos（先起注册中心）"
@@ -153,8 +153,8 @@ else
     if wait_port "${p#*:}" 45; then ok "${p%:*} 端口 ${p#*:} 已就绪"; else warn "${p%:*} 端口 ${p#*:} 未就绪，检查：journalctl -u ${p%:*} -n50"; fi
   done
   echo "    -- 重启 Python 编排层"
-  systemctl restart agent-orchestrator
-  wait_port 8125 30 && ok "orchestrator 8125 已就绪" || warn "orchestrator 8125 未就绪，检查：journalctl -u agent-orchestrator -n50"
+  systemctl restart aismp-orchestrator
+  wait_port 8125 30 && ok "orchestrator 8125 已就绪" || warn "orchestrator 8125 未就绪，检查：journalctl -u aismp-orchestrator -n50"
 fi
 
 fi
