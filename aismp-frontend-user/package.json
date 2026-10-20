@@ -5,6 +5,7 @@
   "type": "module",
   "description": "NexusFlow AI · 业务门户（静态页 + TypeScript 脚本，构建成 IIFE）",
   "scripts": {
+    "dev": "vite --config vite.dev.config.ts",
     "build": "vite build --config vite.portal.config.ts",
     "build:portal": "vite build --config vite.portal.config.ts",
     "typecheck": "tsc --noEmit"
