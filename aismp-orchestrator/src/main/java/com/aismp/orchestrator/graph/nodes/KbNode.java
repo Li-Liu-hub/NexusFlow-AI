@@ -3,6 +3,7 @@ package com.aismp.orchestrator.graph.nodes;
 import com.aismp.orchestrator.client.DigitalHumanClient;
 import com.aismp.orchestrator.config.OrchestratorProperties;
 import com.aismp.orchestrator.graph.StateKeys;
+import com.aismp.orchestrator.graph.StateSupport;
 import com.alibaba.cloud.ai.graph.OverAllState;
 import com.alibaba.cloud.ai.graph.action.NodeAction;
 import org.slf4j.Logger;
@@ -37,20 +38,20 @@ public class KbNode implements NodeAction {
     public Map<String, Object> apply(OverAllState state) {
         long start = System.currentTimeMillis();
         Map<String, Object> data = state.data();
-        String query = text(data.get(StateKeys.QUERY));
-        Map<String, Object> meta = asMap(data.get(StateKeys.META));
+        String query = StateSupport.text(data.get(StateKeys.QUERY));
+        Map<String, Object> meta = StateSupport.asMap(data.get(StateKeys.META));
 
-        String agentCode = text(meta.get("agent_code"));
+        String agentCode = StateSupport.text(meta.get("agent_code"));
         if (agentCode.isEmpty()) {
             agentCode = cfg.getAgentCode();
         }
-        List<String> scope = visibleScope(text(meta.get("warehouse_code")));
+        List<String> scope = visibleScope(StateSupport.text(meta.get("warehouse_code")));
 
         String answer;
         Integer version = null;
         try {
             DigitalHumanClient.ChatResult result = client.chat(
-                    agentCode, query, scope, text(meta.get("conversation_id")));
+                    agentCode, query, scope, StateSupport.text(meta.get("conversation_id")));
             answer = result.answer();
             version = result.version();
         } catch (RuntimeException e) {
@@ -85,12 +86,5 @@ public class KbNode implements NodeAction {
         return List.of(warehouseCode);
     }
 
-    @SuppressWarnings("unchecked")
-    private static Map<String, Object> asMap(Object value) {
-        return value instanceof Map<?, ?> m ? (Map<String, Object>) m : Map.of();
-    }
 
-    private static String text(Object value) {
-        return value == null ? "" : String.valueOf(value).trim();
-    }
 }

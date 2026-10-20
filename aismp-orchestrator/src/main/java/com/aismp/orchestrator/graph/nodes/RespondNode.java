@@ -1,6 +1,7 @@
 package com.aismp.orchestrator.graph.nodes;
 
 import com.aismp.orchestrator.graph.StateKeys;
+import com.aismp.orchestrator.graph.StateSupport;
 import com.alibaba.cloud.ai.graph.OverAllState;
 import com.alibaba.cloud.ai.graph.action.NodeAction;
 
@@ -23,8 +24,8 @@ public class RespondNode implements NodeAction {
     @Override
     public Map<String, Object> apply(OverAllState state) {
         Map<String, Object> data = state.data();
-        String route = text(data.get(StateKeys.ROUTE));
-        String answer = text(data.get(StateKeys.AGENT_RESPONSE));
+        String route = StateSupport.text(data.get(StateKeys.ROUTE));
+        String answer = StateSupport.text(data.get(StateKeys.AGENT_RESPONSE));
 
         // 兜底话术：任何路线给出空回答时，都要让用户收到一句人话，
         // 而不是一片空白（前端拿到空字符串只会渲染出一个空气泡）
@@ -35,13 +36,10 @@ public class RespondNode implements NodeAction {
         Map<String, Object> out = new LinkedHashMap<>();
         out.put(StateKeys.AGENT_RESPONSE, answer);
         out.put(StateKeys.CARDS, data.getOrDefault(StateKeys.CARDS, List.of()));
-        out.put(StateKeys.STRATEGY, text(data.get(StateKeys.STRATEGY)));
+        out.put(StateKeys.STRATEGY, StateSupport.text(data.get(StateKeys.STRATEGY)));
         out.put(StateKeys.ROUTE, route);
-        out.put(StateKeys.SUGGESTION_ID, text(data.get(StateKeys.SUGGESTION_ID)));
+        out.put(StateKeys.SUGGESTION_ID, StateSupport.text(data.get(StateKeys.SUGGESTION_ID)));
         return out;
     }
 
-    private static String text(Object value) {
-        return value == null ? "" : String.valueOf(value).trim();
-    }
 }

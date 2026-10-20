@@ -61,7 +61,6 @@ public class OrchestratorProperties {
     public static class DigitalHuman {
         private String directUrl = "http://127.0.0.1:8126";
         private String agentCode = "terminal_manager";
-        private int timeoutSeconds = 180;
         private String serviceUser = "";
         private String servicePassword = "";
 
@@ -79,14 +78,6 @@ public class OrchestratorProperties {
 
         public void setAgentCode(String agentCode) {
             this.agentCode = agentCode;
-        }
-
-        public int getTimeoutSeconds() {
-            return timeoutSeconds;
-        }
-
-        public void setTimeoutSeconds(int timeoutSeconds) {
-            this.timeoutSeconds = timeoutSeconds;
         }
 
         public String getServiceUser() {
