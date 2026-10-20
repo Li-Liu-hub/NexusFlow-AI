@@ -291,10 +291,11 @@ export default function KbPage() {
             showUploadList={false}
             customRequest={async ({ file, onSuccess, onError }) => {
               try {
-                const res = await api.uploadKbDocument(selected.id, file, category || undefined);
+                const uploadFile = file as File;
+                const res = await api.uploadKbDocument(selected.id, uploadFile, category || undefined);
                 onSuccess(res);
                 antMessage.success(
-                  `已入库「${file.name}」：${res.chunkCount} 个分片（${res.embeddingModel}）`,
+                  `已入库「${uploadFile.name}」：${res.chunkCount} 个分片（${res.embeddingModel}）`,
                 );
                 loadDocs(selected);
                 loadKbs();

@@ -51,7 +51,7 @@ const CAT_COLOR = {
   custom: '#999999',
   entry: '#534ab7',
 };
-const catColorOf = (type, kind) => {
+const catColorOf = (type: string, kind?: string) => {
   if (kind === 'end') return '#c3c3cc';
   if (type === 'agent') return CAT_COLOR.agent;
   return CAT_COLOR[type] || CAT_COLOR.custom;
@@ -95,7 +95,7 @@ function layoutNodes(dsl) {
   }
   let maxLevel = Math.max(0, ...Object.values(level));
   (dsl.nodes || []).forEach((n) => { if (level[n.id] === undefined) level[n.id] = ++maxLevel; });
-  const columns = {};
+  const columns: Record<string, string[]> = {};
   Object.entries(level).forEach(([id, l]) => { (columns[l] = columns[l] || []).push(id); });
   // 布局参数（2026-10-11 视觉调优）：列距 340 / 行距 150，各列按最高列垂直居中，
   // 避免节点挤成一团、连线大面积交叉。

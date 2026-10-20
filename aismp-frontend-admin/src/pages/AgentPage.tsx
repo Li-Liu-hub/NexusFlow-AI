@@ -651,7 +651,15 @@ const ICONS = {
 };
 
 /** 配置分区：图标 + 标题 + 副标题/右侧计数 */
-function Sec({ icon, title, sub, extra, children }) {
+interface SecProps {
+  icon?: any;
+  title?: any;
+  sub?: any;
+  extra?: any;
+  children?: any;
+}
+
+function Sec({ icon, title, sub, extra, children }: SecProps) {
   return (
     <div className="ag-sec">
       <div className="ag-sec-head">

@@ -526,7 +526,7 @@ export default function TokenPage() {
   const pieSource = selDay == null
     ? usageRows
     : usageRows.filter((r) => Number(String(r.usage_date).slice(8, 10)) === selDay);
-  const agentAgg = {};
+  const agentAgg: Record<string, number> = {};
   pieSource.forEach((r) => {
     const c = r.agent_code || 'unassigned';
     agentAgg[c] = (agentAgg[c] || 0) + Number(r.total_tokens || 0);

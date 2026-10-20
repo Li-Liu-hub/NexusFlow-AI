@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Button, Layout, Menu, Tag } from 'antd';
+import type { MenuProps } from 'antd';
 import AgentPage from './pages/AgentPage';
 import SkillPage from './pages/SkillPage';
 import KbPage from './pages/KbPage';
@@ -11,11 +12,11 @@ import TokenPage from './pages/TokenPage';
 import CanvasPage from './pages/CanvasPage';
 import LoginGate from './LoginGate';
 import { getAuth, logout } from './auth';
-import type { AuthUser, MenuEntry } from './types';
+import type { AuthUser } from './types';
 
 const { Sider, Content, Header } = Layout;
 
-const MENU: MenuEntry[] = [
+const MENU: NonNullable<MenuProps['items']> = [
   { key: 'agent', label: '数字员工配置' },
   { key: 'skill', label: '技能管理' },
   { key: 'kb', label: '知识库管理' },
