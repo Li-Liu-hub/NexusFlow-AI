@@ -37,9 +37,6 @@ const BAR_COLOR = {
   不限: '#5b8ff9',
 };
 
-/** 状态 → Tag 颜色 */
-const TAG_COLOR = { 已超限: 'red', 接近上限: 'orange', 正常: 'blue', 不限: 'default' };
-
 const STATUS_LEGEND = ['正常', '接近上限', '已超限', '不限'];
 
 /** 月配额达到该值时按「不限量」展示（与配额规则表的判定一致） */

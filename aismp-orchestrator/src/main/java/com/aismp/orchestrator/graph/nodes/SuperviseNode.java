@@ -1,6 +1,7 @@
 package com.aismp.orchestrator.graph.nodes;
 
 import com.aismp.orchestrator.graph.StateKeys;
+import com.aismp.orchestrator.graph.StateSupport;
 import com.aismp.orchestrator.llm.LlmRouter;
 import com.alibaba.cloud.ai.graph.OverAllState;
 import com.alibaba.cloud.ai.graph.action.NodeAction;
@@ -31,11 +32,11 @@ public class SuperviseNode implements NodeAction {
     public Map<String, Object> apply(OverAllState state) {
         long start = System.currentTimeMillis();
         Map<String, Object> data = state.data();
-        Map<String, Object> meta = asMap(data.get(StateKeys.META));
+        Map<String, Object> meta = StateSupport.asMap(data.get(StateKeys.META));
 
-        String suggestionId = text(meta.get(StateKeys.SUGGESTION_ID));
+        String suggestionId = StateSupport.text(meta.get(StateKeys.SUGGESTION_ID));
         if (suggestionId.isEmpty()) {
-            suggestionId = text(data.get(StateKeys.SUGGESTION_ID));
+            suggestionId = StateSupport.text(data.get(StateKeys.SUGGESTION_ID));
         }
         if (!suggestionId.isEmpty()) {
             Map<String, Object> out = new HashMap<>();
@@ -48,7 +49,7 @@ public class SuperviseNode implements NodeAction {
         }
 
         LlmRouter.RouteDecision decision =
-                router.route(text(data.get(StateKeys.QUERY)), text(meta.get("user_id")));
+                router.route(StateSupport.text(data.get(StateKeys.QUERY)), StateSupport.text(meta.get("user_id")));
 
         Map<String, Object> out = new HashMap<>();
         out.put(StateKeys.ROUTE, decision.route());
@@ -59,12 +60,5 @@ public class SuperviseNode implements NodeAction {
         return out;
     }
 
-    @SuppressWarnings("unchecked")
-    private static Map<String, Object> asMap(Object value) {
-        return value instanceof Map<?, ?> m ? (Map<String, Object>) m : Map.of();
-    }
 
-    private static String text(Object value) {
-        return value == null ? "" : String.valueOf(value).trim();
-    }
 }

@@ -28,7 +28,6 @@ orchestrator:
   digital-human:
     direct-url: ${DIGITAL_HUMAN_DIRECT_URL:http://127.0.0.1:8126}
     agent-code: ${DIGITAL_HUMAN_AGENT_CODE:terminal_manager}
-    timeout-seconds: 180
     service-user: ${ORCH_SVC_USER:}
     service-password: ${ORCH_SVC_PASSWORD:}
 

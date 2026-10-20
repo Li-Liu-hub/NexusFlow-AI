@@ -12,7 +12,7 @@
  * 2026-10-11 下午：样式统一 —— 对齐全站 ag-* 设计语言（满高三栏白卡 + 紫点缀），
  *   reactflow 节点/连线改主题色，版本管理收进右列。
  */
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Button, Collapse, Empty, Input, InputNumber, message, Modal, Popconfirm, Select,
   Tabs, Tag, Tooltip, Typography,

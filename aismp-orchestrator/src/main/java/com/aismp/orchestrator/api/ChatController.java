@@ -72,15 +72,36 @@ public class ChatController {
             @RequestHeader(name = "X-User-Id", required = false) String headerUser,
             @RequestHeader(name = "X-User-Warehouse", required = false) String headerWarehouse) {
 
-        // 门户通道：网关注入的头优先（非空即代表是网关写过的权威身份）
-        String effectiveUser = isBlank(headerUser) ? userId : headerUser.trim();
-        String effectiveWarehouse = isBlank(headerUser) ? warehouseCode
-                : (headerWarehouse == null ? "" : headerWarehouse.trim());
+        Identity identity = resolveIdentity(headerUser, headerWarehouse, userId, warehouseCode);
 
         SseEmitter emitter = new SseEmitter(0L);
-        executor.submit(() -> run(emitter, query, effectiveUser, suggestionId,
-                effectiveWarehouse, conversationId));
+        executor.submit(() -> run(emitter, query, identity.userId(), suggestionId,
+                identity.warehouseCode(), conversationId));
         return emitter;
+    }
+
+    /**
+     * 身份解析：<b>网关写过的头优先于 query 参数</b>。
+     *
+     * <p>为什么单独抽出来：这是数据可见范围的信任根 —— 浏览器能随便改 query 里的 user_id /
+     * warehouse_code，改不了网关注入的头。一旦这里写错，用户就能改个参数看到别的仓。
+     * 抽成纯函数才能直接测（见 ChatControllerIdentityTest），不用起容器。
+     *
+     * <p>头的存在即代表"网关已经写过"：headerUser 非空时，warehouse 也只认头，
+     * 即使头里的仓位是空串（那是"该用户没有仓位"的意思，不能退回 query）。
+     */
+    static Identity resolveIdentity(String headerUser, String headerWarehouse,
+                                    String queryUser, String queryWarehouse) {
+        if (isBlank(headerUser)) {
+            return new Identity(isBlank(queryUser) ? "anonymous" : queryUser.trim(),
+                    queryWarehouse == null ? "" : queryWarehouse.trim());
+        }
+        return new Identity(headerUser.trim(),
+                headerWarehouse == null ? "" : headerWarehouse.trim());
+    }
+
+    /** 解析后的调用身份。 */
+    record Identity(String userId, String warehouseCode) {
     }
 
     private void run(SseEmitter emitter, String query, String userId, String suggestionId,

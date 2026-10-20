@@ -21,26 +21,16 @@ public final class StateKeys {
     // ---- 路由 ----
     public static final String ROUTE = "route";
 
-    // ---- chart 路线 ----
-    public static final String CHART_PLAN = "chart_plan";
-
     // ---- kb 通道 ----
     public static final String REWRITTEN_QUERY = "rewritten_query";
     public static final String AGENT_RESPONSE = "agent_response";
 
     // ---- replenish 通道 ----
-    public static final String INVENTORY_SNAPSHOT = "inventory_snapshot";
-    public static final String ALGO_RESULT = "algo_result";
     public static final String STRATEGY = "strategy";
     public static final String CARDS = "cards";
     public static final String SUGGESTION_ID = "suggestion_id";
 
-    // ---- order 通道 ----
-    public static final String ORDER_INFO = "order_info";
-
-    // ---- 质检 ----
-    public static final String CRITIC_FEEDBACK = "critic_feedback";
-    public static final String CRITIC_GATE = "critic_gate";
+    // ---- 质检（当前未使用，等 critic 迁入后再启用）----
     public static final String REVISION_COUNT = "revision_count";
 
     // ---- 元信息（MergeStrategy：多节点写不丢 key）----
