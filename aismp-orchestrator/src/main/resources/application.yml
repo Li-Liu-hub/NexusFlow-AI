@@ -1,0 +1,24 @@
+server:
+  port: 8125
+
+spring:
+  application:
+    name: aismp-orchestrator
+
+# 编排层配置（对应原 Python 版 config.py）
+# 敏感值一律走环境变量，仓库里只有空默认值 —— 与全项目「密钥不进仓库」约定一致
+orchestrator:
+  llm:
+    base-url: ${LLM_BASE_URL:https://api.z.ai/api/coding/paas/v4}
+    api-key: ${LLM_API_KEY:}
+    model: ${LLM_MODEL:glm-5.2}
+  digital-human:
+    direct-url: ${DIGITAL_HUMAN_DIRECT_URL:http://127.0.0.1:8126}
+    agent-code: ${DIGITAL_HUMAN_AGENT_CODE:terminal_manager}
+    timeout-seconds: 180
+    service-user: ${ORCH_SVC_USER:}
+    service-password: ${ORCH_SVC_PASSWORD:}
+
+logging:
+  level:
+    com.aismp.orchestrator: INFO
