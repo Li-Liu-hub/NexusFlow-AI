@@ -1,11 +1,20 @@
 # NexusFlow AI
 
+> [!IMPORTANT]
+> **这是一个比赛演示项目（Competition Demo），不是生产级系统。**
+> 数据为脱敏样例，演示账号口令固定为 `123456`；未做多副本、备份、审计合规与容量规划，
+> 请勿直接用于生产。**欢迎提 Issue 与 PR**（见 [十一、参与贡献](#十一参与贡献欢迎-issue--pr)）。
+
 > 面向运营商固网终端的 **AI 智能体平台**：在 API 开放平台的地基上，统一管理 REST API / AI Agent / MCP
 > 三类服务的鉴权、限流与计量；落地场景是终端「补货建议 → 调拨闭环」的全流程自动化。
 >
 > 核心主张：**业务数字全部来自查库 + 确定性算法，LLM 不参与算数。**
 >
 > 技术栈：Java 21 / Spring Boot 4 / Spring AI 2.0 / Spring AI Alibaba Graph · TypeScript · 全套容器化。
+>
+> 仓库：<https://github.com/Li-Liu-hub/NexusFlow-AI> ·
+> [提 Issue](https://github.com/Li-Liu-hub/NexusFlow-AI/issues/new) ·
+> [提 PR](https://github.com/Li-Liu-hub/NexusFlow-AI/compare)
 
 ---
 
@@ -242,6 +251,36 @@ NexusFlow-AI/
 
 ---
 
-## 十一、License
+## 十一、参与贡献（欢迎 Issue / PR）
+
+本项目是**比赛演示项目**，但它不是玩具仓库：欢迎任何形式的反馈 —— 发现 bug、文档写错、
+觉得某个设计站不住脚，都可以直接开 Issue；想动手改，随时提 PR。
+
+### 提 Issue
+
+请带上这几样，能省掉一半来回：
+
+- **环境**：操作系统 / JDK 版本 / 浏览器（前端问题）
+- **复现步骤**：从哪一步开始、点了什么
+- **期望 vs 实际**：最好附截图或日志片段
+- **日志位置**：服务日志在 `local-init/logs/`；容器里用 `docker logs ap-<服务名>`
+
+> 安全问题（凭据泄露、越权、注入）请**不要**开公开 Issue，直接私信维护者。
+
+### 提 PR
+
+1. Fork 后从 `main` 开分支，命名 `feat/xxx`、`fix/xxx`、`docs/xxx`
+2. **先在本地过门禁**：`bash scripts/test-all.sh`（Java 单测 + 多租户 DB 校验 + 两端 TypeScript）
+3. 提交信息说清「做了什么」，中文没问题；一次 PR 只做一件事
+4. PR 描述里写三件事：改了什么、为什么改、**怎么验证的**（贴命令输出或截图）
+5. 不要提交密钥、`.env`、`credentials.env`、构建产物（`.gitignore` 已覆盖）
+
+### 代码约定
+
+见 [九、开发约定](#九开发约定) —— PR 请照着那四条来，尤其是「密钥不进仓库」和「改完先跑门禁」。
+
+---
+
+## 十二、License
 
 见根目录 `LICENSE`。
