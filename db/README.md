@@ -15,9 +15,6 @@ db/
 │   ├── 01-schema-terminal_kb.sql     # 向量/编排库 terminal_kb —— 6 张表（仅结构）
 │   ├── 10-seed-terminal_kb.sql       # 配置种子：画布节点定义 28 条
 │   └── 99-drop-oa-legacy.sql         # 可选：清理已废弃的 OA 场景残留表
-├── tools/
-│   ├── fix-dump-comments.py          # 修正 dump 产物的「双重编码」乱码注释（可逆部分）
-│   └── fix-dump-comments-broken.py   # 修正信息已丢失的注释（按语义定向映射）
 └── README.md
 ```
 
@@ -76,7 +73,7 @@ $PSQL -f db/pg/10-seed-terminal_kb.sql
 - **向量维度**：`vector_store` 按 `BAAI/bge-m3` 的 **1024 维**建表，换嵌入模型需同步改维度。
 - **注释乱码已修**：源库 `api_db` / `terminal_db` 的少数表是历史用错字符集建的，
   `COMMENT` 里存的是**双重编码**结果（例：`账号` 的 UTF-8 字节被误按 GBK 解码成 `璐﹀彿` 再存为 UTF-8）。
-  已用 `db/tools/` 下两个脚本还原 **46 处**（`账号`/`名称`/`更新时间`/`是否删除`/`审核状态`…）。
+  已还原 **46 处**（`账号`/`名称`/`更新时间`/`是否删除`/`审核状态`…）；一次性修复脚本用完即删。
   其中带 `?` 的属原始字节已丢失，按字段语义定向重建。
 
 ## 与 `local-init/` 的关系

@@ -1,12 +1,12 @@
 {
-  // 用户端 TypeScript 配置（与 admin 同一套策略：
-  // 先让「全量 .ts/.tsx + tsc 通过」成立，再逐页开 strict）
+  // 用户端 TypeScript 配置（只剩门户脚本 src/portal/portal.ts；
+  // 原来的 React 对话页已删除 —— 生产门户是 public/portal.html + 本目录脚本构建出的 portal.js）
   "compilerOptions": {
     "target": "ES2022",
     "lib": ["ES2022", "DOM", "DOM.Iterable"],
     "module": "ESNext",
     "moduleResolution": "bundler",
-    "jsx": "react-jsx",
+    
     "strict": false,
     "noImplicitAny": false,
     "noUnusedLocals": false,
@@ -20,5 +20,5 @@
     "forceConsistentCasingInFileNames": true,
     "types": ["vite/client"]
   },
-  "include": ["src", "vite.config.ts"]
+  "include": ["src", "vite.portal.config.ts"]
 }

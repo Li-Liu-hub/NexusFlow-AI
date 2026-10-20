@@ -90,7 +90,12 @@ for app in aismp-frontend-admin aismp-frontend-user; do
     continue
   fi
   run_step "$app: tsc --noEmit" bash -c "cd '$app' && npx tsc --noEmit"
-  run_vitest "$app"
+  # 没有 test 脚本的工程（如只剩门户脚本的用户端）跳过 vitest，不算失败
+  if grep -q '"test"' "$app/package.json"; then
+    run_vitest "$app"
+  else
+    note_skip "$app: vitest (no test script)"
+  fi
 done
 
 # --- summary ----------------------------------------------------------------
