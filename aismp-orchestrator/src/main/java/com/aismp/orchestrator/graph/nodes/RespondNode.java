@@ -26,11 +26,10 @@ public class RespondNode implements NodeAction {
         String route = text(data.get(StateKeys.ROUTE));
         String answer = text(data.get(StateKeys.AGENT_RESPONSE));
 
-        // 阶段 1 只迁了 kb 路线：其余三条给出明确的「未迁移」提示，
-        // 而不是伪装成正常回答（原 Python 版仍在线上服务，不会造成用户侧影响）
-        if (answer.isEmpty() && !StateKeys.ROUTE_KB.equals(route)
-                && !StateKeys.ROUTE_ORDER.equals(route)) {
-            answer = "路线 " + route + " 尚未迁移到 Java 编排层";
+        // 兜底话术：任何路线给出空回答时，都要让用户收到一句人话，
+        // 而不是一片空白（前端拿到空字符串只会渲染出一个空气泡）
+        if (answer.isEmpty() && !StateKeys.ROUTE_ORDER.equals(route)) {
+            answer = "抱歉，暂时没能处理这个请求，请换个问法或稍后再试。";
         }
 
         Map<String, Object> out = new LinkedHashMap<>();

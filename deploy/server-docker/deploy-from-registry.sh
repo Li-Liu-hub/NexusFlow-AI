@@ -104,7 +104,7 @@ docker info >/dev/null 2>&1 || die "Docker 守护进程未运行：systemctl sta
 #     docker.m.daocloud.io      ❌ 拒绝该命名空间 ★ 本机现在配的就是它，别照抄到服务器
 #     docker.1panel.live / docker.ketches.cn  ? 403 无挑战头，不可用
 #     docker.mirrors.ustc.edu.cn / dockerpull.org  ❌ 连不上
-# 所以固定用 1ms.run 主 + hub.rat.dev / 腾讯云内网 备。换源前请用 mirror_probe2.py 复测。
+# 所以固定用 1ms.run 主 + hub.rat.dev / 腾讯云内网 备。换源前先手工复测一遍再改。
 # ⚠️ 复测时必须用【真实存在的用户名】：拿一个不存在的用户名去测会得到假结果
 #    （实测 jsy16 不存在→daocloud 403、腾讯云 403；jsyl6 存在→腾讯云 404 即会代理）。
 MIRROR_FILE=/etc/docker/daemon.json

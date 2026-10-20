@@ -52,10 +52,12 @@ class RespondNodeTest {
     }
 
     @Test
-    void unimigratedRouteSaysSo() {
+    void emptyAnswerFallsBackToHumanSentence() {
+        // 空回答必须兜一句人话；且不能暴露内部实现状态（线路名 / 迁移进度都不该出现在对客文案里）
         Map<String, Object> out = NODE.apply(state(Map.of(StateKeys.ROUTE, StateKeys.ROUTE_CHART)));
-        assertThat(out.get(StateKeys.AGENT_RESPONSE)).asString()
-                .contains("chart").contains("尚未迁移");
+        String answer = String.valueOf(out.get(StateKeys.AGENT_RESPONSE));
+        assertThat(answer).isNotEmpty().contains("稍后再试");
+        assertThat(answer).doesNotContain("chart").doesNotContain("迁移");
     }
 
     @Test
