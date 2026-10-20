@@ -1,0 +1,27 @@
+{
+  // 管理端 TypeScript 配置。
+  //
+  // 迁移策略：先让「全量文件都是 .ts/.tsx + tsc 通过」成立，再逐页收紧。
+  // 因此这里 strict 暂为 false —— 页面级 DTO 逐个补齐后再开 true，
+  // 否则一次性开严格模式会逼出一个 4000 行的「any 大扫除」，反而更不可维护。
+  "compilerOptions": {
+    "target": "ES2022",
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "jsx": "react-jsx",
+    "strict": false,
+    "noImplicitAny": false,
+    "noUnusedLocals": false,
+    "noUnusedParameters": false,
+    "noEmit": true,
+    "isolatedModules": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "resolveJsonModule": true,
+    "allowSyntheticDefaultImports": true,
+    "forceConsistentCasingInFileNames": true,
+    "types": ["vite/client"]
+  },
+  "include": ["src", "vite.config.ts"]
+}

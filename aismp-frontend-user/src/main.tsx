@@ -2,10 +2,15 @@ import React from 'react';
 import ReactDOM from 'react-dom/client';
 import { ConfigProvider } from 'antd';
 import zhCN from 'antd/locale/zh_CN';
-import App from './App.jsx';
+import App from './App';
 import './styles.css';
 
-ReactDOM.createRoot(document.getElementById('root')).render(
+const container = document.getElementById('root');
+if (!container) {
+  throw new Error('#root 不存在：index.html 与构建入口不匹配');
+}
+
+ReactDOM.createRoot(container).render(
   <React.StrictMode>
     <ConfigProvider
       locale={zhCN}
@@ -18,5 +23,5 @@ ReactDOM.createRoot(document.getElementById('root')).render(
     >
       <App />
     </ConfigProvider>
-  </React.StrictMode>
+  </React.StrictMode>,
 );

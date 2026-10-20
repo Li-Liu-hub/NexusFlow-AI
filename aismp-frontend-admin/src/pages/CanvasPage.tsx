@@ -22,8 +22,8 @@ import ReactFlow, {
   useEdgesState, useNodesState,
 } from 'reactflow';
 import 'reactflow/dist/style.css';
-import { getToken } from '../auth.js';
-import { listAgents } from '../api.js';
+import { getToken } from '../auth';
+import { listAgents } from '../api';
 
 const GUARDS = ['verify_numbers', 'respond'];
 const END_ID = '__end__';
