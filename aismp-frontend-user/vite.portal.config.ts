@@ -8,6 +8,9 @@ import { defineConfig } from 'vite';
 //
 // 产物 public/portal.js 是**构建产物**，已加入 .gitignore —— 仓库里只保留 TS 源码。
 export default defineConfig({
+  // 产物直接写回 public/，必须关掉 publicDir 拷贝（否则 vite 会警告两者是同一目录）。
+  // 注意它是**顶层**选项，不是 build.* 下的字段。
+  publicDir: false,
   build: {
     lib: {
       entry: 'src/portal/portal.ts',
@@ -16,10 +19,8 @@ export default defineConfig({
       fileName: () => 'portal.js',
     },
     outDir: 'public',
-    // 产物直接写回 public/，所以必须关掉 publicDir 拷贝（否则 vite 会警告两者同一目录）
-    publicDir: false,
     emptyOutDir: false,
-    // 与 app 构建保持一致：跳过 esbuild 压缩（本机安全软件会对临时文件报 Access is denied）
+    // 跳过压缩：本机安全软件会对 esbuild 的临时文件报 Access is denied
     minify: false,
     target: 'esnext',
     cssCodeSplit: false,
