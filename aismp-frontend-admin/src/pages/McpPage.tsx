@@ -260,7 +260,7 @@ export default function McpPage() {
                 {
                   title: '操作',
                   width: 130,
-                  render: (_, t) =>
+                  render: (_: any, t: any) =>
                     generated[t.name] || existingMcpTools.includes(t.name) ? (
                       <Tag color="green">已生成</Tag>
                     ) : (

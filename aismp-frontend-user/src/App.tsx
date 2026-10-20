@@ -69,7 +69,7 @@ export default function App() {
   }
 
   /** 发送并接收回答 */
-  async function send(text) {
+  async function send(text: string = input) {
     const question = (text ?? input).trim();
     if (!question || loading) return;
 
