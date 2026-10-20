@@ -6,7 +6,9 @@
   "description": "终端 AI 智慧管理平台 · 用户端（对话界面）",
   "scripts": {
     "dev": "vite --host 127.0.0.1 --port 5173",
-    "build": "vite build",
+    "build": "npm run build:portal && npm run build:app",
+    "build:app": "vite build",
+    "build:portal": "vite build --config vite.portal.config.ts",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "preview": "vite preview --host 127.0.0.1 --port 4173"

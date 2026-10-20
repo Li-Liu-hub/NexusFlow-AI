@@ -3,7 +3,7 @@
 set -uo pipefail
 
 echo "=== [1/4] 服务状态 ==="
-for s in nacos aismp-backend aismp-gateway aismp-agent aismp-interface agent-orchestrator; do
+for s in nacos aismp-backend aismp-gateway aismp-agent aismp-interface aismp-orchestrator; do
   printf "  %-20s %s\n" "$s" "$(systemctl is-active $s 2>/dev/null)"
 done
 

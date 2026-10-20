@@ -5,7 +5,7 @@
 #   每个 JVM 都显式限 -Xmx，否则默认按物理内存的 1/4 取堆，四个服务一起起来必 OOM。
 #   nginx 托管前端静态产物（不能跑 umi dev，开发模式要 500MB~1GB）。
 #
-# 前置：jar 已上传到 /opt/app/*/app.jar；编排层代码在 /opt/app/orchestrator
+# 前置：jar 已上传到 /opt/app/*/app.jar（编排层同样是 jar：/opt/app/orchestrator/app.jar）
 # 用法：python ssh_run_script.py 50-deploy-apps.sh --root
 set -uo pipefail
 
@@ -68,41 +68,33 @@ write_unit "aismp-gateway"   /opt/app/gateway   "${J8}"  256m 8090 "--server.por
 write_unit "aismp-agent"     /opt/app/agent     "${J21}" 512m 8124 "--server.port=8124"
 
 echo
-echo "--- [2/5] 编排层（Python）---"
-if [ -d /opt/app/orchestrator ]; then
-  # 首次：建 venv 装依赖
-  if [ ! -x /opt/app/orchestrator/.venv/bin/python ]; then
-    echo "  创建 venv 并安装依赖（首次较慢）…"
-    apt-get install -y -qq python3-venv python3-pip >/dev/null 2>&1 || true
-    python3 -m venv /opt/app/orchestrator/.venv
-    /opt/app/orchestrator/.venv/bin/pip install -q --upgrade pip \
-      -i https://pypi.tuna.tsinghua.edu.cn/simple
-    /opt/app/orchestrator/.venv/bin/pip install -q \
-      fastapi uvicorn httpx "langgraph>=0.2" "langchain-openai>=0.2" \
-      python-dotenv pydantic-settings \
-      -i https://pypi.tuna.tsinghua.edu.cn/simple 2>&1 | tail -3
-  fi
-  # 编排层自己的 .env（网关三元组 + LLM）
-  cat > /opt/app/orchestrator/.env <<EOF
-GATEWAY_BASE_URL=http://127.0.0.1:8090
-GATEWAY_ACCESS_KEY=aismp-console
-GATEWAY_SECRET_KEY=7c1f9a3e5d0b2846af31c7e9b0d45268
+echo "--- [2/5] 编排层（Java · Spring AI Alibaba Graph）---"
+# 2026-10-20：Python/LangGraph 版已移除，编排层由 aismp-orchestrator 模块（jar）承担。
+# 监听端口不变（8125），网关 /api/orchestrator/** 无需改动。
+if [ -f /opt/app/orchestrator/app.jar ]; then
+  # 敏感值走 EnvironmentFile（不再把网关 SK 写进 unit 文件）
+  cat > /opt/app/orchestrator/orchestrator.env <<EOF
 LLM_API_KEY=$(grep '^MIMO_API_KEY=' "${CRED}" | cut -d= -f2-)
 LLM_BASE_URL=https://api.xiaomimimo.com/v1
 LLM_MODEL=mimo-v2.6-flash
-LLM_PROXY=
+DIGITAL_HUMAN_DIRECT_URL=http://127.0.0.1:8126
+ORCH_SVC_USER=svc_orchestrator
+ORCH_SVC_PASSWORD=$(grep '^ORCH_SVC_PASSWORD=' "${CRED}" 2>/dev/null | cut -d= -f2-)
 EOF
-  cat > /etc/systemd/system/agent-orchestrator.service <<'EOF'
+  chmod 600 /opt/app/orchestrator/orchestrator.env
+
+  cat > /etc/systemd/system/aismp-orchestrator.service <<'UNIT'
 [Unit]
-Description=agent-orchestrator
-After=network-online.target
+Description=aismp-orchestrator (Spring AI Alibaba Graph)
+After=network-online.target aismp-digital-human.service
 Wants=network-online.target
 
 [Service]
 Type=simple
 User=ubuntu
 WorkingDirectory=/opt/app/orchestrator
-ExecStart=/opt/app/orchestrator/.venv/bin/python -m uvicorn server:app --host 127.0.0.1 --port 8125
+EnvironmentFile=/opt/app/orchestrator/orchestrator.env
+ExecStart=/usr/bin/java -Xms128m -Xmx384m -jar /opt/app/orchestrator/app.jar --server.port=8125
 SuccessExitStatus=143
 Restart=on-failure
 RestartSec=15
@@ -111,14 +103,13 @@ StandardError=append:/var/log/aismp/orchestrator.log
 
 [Install]
 WantedBy=multi-user.target
-EOF
-  echo "  写入 agent-orchestrator.service"
+UNIT
+  echo "  写入 aismp-orchestrator.service"
   chown -R ubuntu:ubuntu /opt/app/orchestrator
 else
-  echo "  （跳过：/opt/app/orchestrator 不存在，先上传编排层代码）"
+  echo "  （跳过：/opt/app/orchestrator/app.jar 不存在，先上传编排层 jar）"
 fi
 
-echo
 echo "--- [3/5] 启动服务（按依赖顺序）---"
 systemctl daemon-reload
 for svc in aismp-interface aismp-backend aismp-gateway; do
@@ -137,7 +128,7 @@ for i in $(seq 1 24); do
   [ "$code" != "000" ] && break
 done
 
-for svc in aismp-agent agent-orchestrator; do
+for svc in aismp-agent aismp-orchestrator; do
   systemctl enable "${svc}" >/dev/null 2>&1
   systemctl restart "${svc}"
   echo -n "  ${svc}: "

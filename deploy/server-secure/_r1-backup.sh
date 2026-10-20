@@ -11,7 +11,7 @@ df -h / | tail -1
 mkdir -p /opt/backup/units-20261006
 
 echo "=== 备份 systemd unit ==="
-for u in nacos aismp-interface aismp-backend aismp-gateway aismp-agent agent-orchestrator; do
+for u in nacos aismp-interface aismp-backend aismp-gateway aismp-agent aismp-orchestrator; do
   if [ -f "/etc/systemd/system/${u}.service" ]; then
     cp -a "/etc/systemd/system/${u}.service" /opt/backup/units-20261006/
     echo "  已备份 ${u}.service"

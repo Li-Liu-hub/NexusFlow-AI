@@ -1,37 +1,19 @@
 version: '1.0'
 name: ci
-displayName: 持续集成（Python 单测/lint + Java 编译）
+displayName: 持续集成（Java 编译 + 编排层单测）
 triggers:
   push:
     branches:
       include:
         - main
 stages:
-  - name: stage-python
-    displayName: agent-orchestrator 单测与 lint
-    failFast: true
-    steps:
-      - step: shell@agent
-        name: orchestrator_pytest
-        displayName: Python 单测（pytest）+ 缺陷类 lint（ruff）
-        inputs:
-          - name: shell_commands
-            value: |
-              set -e
-              python3 --version
-              python3 -m pip install --quiet uv ruff
-              cd agent-orchestrator
-              uv sync --frozen
-              uv run pytest tests/ -q
-              # 缺陷类规则：语法错误 / 未定义名（E9,F63,F7,F82）——测试全绿时的冒烟 lint
-              ruff check --select E9,F63,F7,F82 .
   - name: stage-java
-    displayName: Java 三模块编译
+    displayName: Java 四模块编译 + 编排层单测
     failFast: true
     steps:
       - step: shell@agent
         name: java_build
-        displayName: backend(含网关) / agent / digital-human
+        displayName: backend(含网关) / agent / digital-human / orchestrator
         inputs:
           - name: shell_commands
             value: |
@@ -66,4 +48,7 @@ stages:
               mvn -B -q -DskipTests -f pom.xml -pl aismp-backend -am compile
               mvn -B -q -DskipTests -f aismp-agent/pom.xml package
               mvn -B -q -DskipTests -f aismp-digital-human/pom.xml package
-              echo "Java build OK"
+              # 编排层（原 Python/LangGraph 已移除）：编译 + 单测都在这里跑
+              mvn -B -q -DskipTests -f aismp-orchestrator/pom.xml package
+              mvn -B -f aismp-orchestrator/pom.xml test
+              echo "Java build + orchestrator tests OK"

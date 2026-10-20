@@ -101,7 +101,7 @@ business:
 # ============================================================
 # 业务参数
 # ============================================================
-# 库存告警巡检周期已上移到编排层（agent-orchestrator 的 alert 图）配置：
+# 库存告警巡检周期已上移到编排层（aismp-orchestrator 的 alert 图）配置：
 #   本服务只提供原子能力 POST /terminal/stockAlert/scan（查+判定）与
 #   POST /transferOrder/notice（写通知，去重）；定时触发不再由本服务承担。
-#   编排层周期配置见 agent-orchestrator 的 ALERT_INTERVAL_SECONDS（默认 600 秒）。
+#   编排层周期配置见 aismp-orchestrator 的 orchestrator.alert.interval-seconds（默认 600 秒）。

@@ -1,19 +1,29 @@
 #!/usr/bin/env bash
 # ============================================================
-# agent-orchestrator (Python / LangGraph) 启动脚本
+# aismp-orchestrator（Java · Spring AI Alibaba Graph）本机启动脚本
 #
-# 注意：uv 的 venv 建在项目目录下（路径含中文）时，venv 内的 python 启动器
-# 读不到自己的 pyvenv.cfg（报 `Cannot read 'D:\????\...'`），所以本项目把
-# venv 放到 ASCII 路径 D:\env\venvs\agent-orchestrator（UV_PROJECT_ENVIRONMENT）。
-#   重建：cd agent-orchestrator && UV_PROJECT_ENVIRONMENT='D:\env\venvs\agent-orchestrator' uv sync
+# 2026-10-20：原 Python/LangGraph 版已移除，编排层改为 jar 启动，端口仍是 8125，
+# 网关 /api/orchestrator/** 与前端都不需要改。
+#
+# 本机三件事（都在这里处理，别再手工补）：
+#   1. JAVA_HOME 必须是 JDK 21 —— shell 里常年挂着的 17 会让 Spring Boot 4 直接起不来
+#   2. unset SERVER_PORT / SERVER__PORT —— 这两个环境变量会劫持 server.port
+#   3. 敏感值走环境变量（LLM_API_KEY / ORCH_SVC_USER / ORCH_SVC_PASSWORD）
+#
+# 先构建：cd aismp-orchestrator && mvn -B -DskipTests package
 # ============================================================
 set -uo pipefail
 
-VENV="D:/env/venvs/agent-orchestrator"
-BASE="D:/亚信科技/学习日志/比赛/agent-platform/agent-orchestrator"
+BASE="$(cd "$(dirname "$0")/.." && pwd)"
+JAR="$BASE/aismp-orchestrator/target/aismp-orchestrator-0.0.1-SNAPSHOT.jar"
 
-[ -x "$VENV/Scripts/python.exe" ] || { echo "ERROR: 未找到 venv：$VENV（先跑 uv sync）" >&2; exit 1; }
+export JAVA_HOME="${NEXUSFLOW_JDK21:-D:/env/jdk-21}"
+export PATH="$JAVA_HOME/bin:$PATH"
+unset SERVER_PORT SERVER__PORT
 
-cd "$BASE" || exit 1
-echo "启动 agent-orchestrator (端口 8125) ..."
-exec "$VENV/Scripts/python.exe" -m uvicorn server:app --host 127.0.0.1 --port 8125
+[ -f "$JAR" ] || { echo "ERROR: 未找到 jar：$JAR（先 mvn -B -DskipTests package）" >&2; exit 1; }
+
+echo "启动 aismp-orchestrator (端口 8125) ..."
+echo "  JAVA_HOME=${JAVA_HOME}"
+echo "  内核地址=${DIGITAL_HUMAN_DIRECT_URL:-http://127.0.0.1:8126}"
+exec java -Xms128m -Xmx384m -jar "$JAR" --server.port=8125

@@ -68,3 +68,6 @@ docs/容器化与安全核查报告-2026-10-10.md
 docs/架构重构-进度与交接.md
 docs/规划-鉴权配额迁移与管理面补齐.md
 docs/架构评审-2026-10-11.md
+
+# ===== 前端构建产物（portal.js 由 src/portal/portal.ts 构建生成）=====
+aismp-frontend-user/public/portal.js

@@ -1,7 +1,7 @@
 #!/bin/bash
 # ============================================================================
 # 在「本机」执行：收集部署所需产物到 deploy/server-docker/
-# 产物：jars/（5 个 jar）、web/（前端构建产物）、orchestrator 源码
+# 产物：jars/（6 个 jar）、web/（前端构建产物）
 # 全程用绝对路径定位 jar（首版在 cd 之后用相对路径，多层目录下必错）
 # ============================================================================
 set -euo pipefail
@@ -17,13 +17,25 @@ echo "══ [1/4] 构建 backend 聚合工程（backend / gateway / interface�
 cp "$BASE/aismp-backend/target/aismp-backend-0.0.1-SNAPSHOT.jar"       "$DEST/jars/aismp-backend.jar"
 cp "$BASE/aismp-backend/aismp-gateway/target/aismp-gateway-0.0.1-SNAPSHOT.jar"     "$DEST/jars/aismp-gateway.jar"
 
-echo "══ [2/4] 构建 JDK21 两个（agent / digital-human）══"
+echo "══ [2/4] 构建 JDK21 三个（agent / digital-human / orchestrator）══"
 (cd "$BASE/aismp-agent" && JAVA_HOME="$JDK21" mvn -B clean package -DskipTests -q)
 cp "$BASE/aismp-agent/target/aismp-agent-0.0.1-SNAPSHOT.jar" "$DEST/jars/aismp-agent.jar"
 (cd "$BASE/aismp-digital-human" && JAVA_HOME="$JDK21" mvn -B clean package -DskipTests -q)
 cp "$BASE/aismp-digital-human/target/aismp-digital-human-0.0.1-SNAPSHOT.jar" "$DEST/jars/aismp-digital-human.jar"
+# 编排层：原 Python 版已移除，现在是同版本栈的 Java 模块（Spring AI Alibaba Graph）
+(cd "$BASE/aismp-orchestrator" && JAVA_HOME="$JDK21" mvn -B clean package -DskipTests -q)
+cp "$BASE/aismp-orchestrator/target/aismp-orchestrator-0.0.1-SNAPSHOT.jar" "$DEST/jars/aismp-orchestrator.jar"
 
 echo "══ [3/4] 前端构建产物 ══"
+# 门户脚本：public/portal.js 是 src/portal/portal.ts 的构建产物（已 gitignore），
+# 所以这里必须先构建一次，否则拷走的是旧文件或根本没有文件。
+cd "$BASE/aismp-frontend-user"
+if [ ! -d node_modules ]; then
+  npm install --registry=https://registry.npmmirror.com --no-fund --no-audit
+fi
+export ESBUILD_BINARY_PATH='D://env//esbuild//esbuild-admin.exe'
+npx vite build --config vite.portal.config.ts
+cd "$BASE"
 # portal（单文件：样式与脚本全部内联，无外部资源缓存问题）
 rm -rf "$DEST/web/portal" && mkdir -p "$DEST/web/portal"
 cp "$BASE/aismp-frontend-user/public/portal.html" "$DEST/web/portal/portal.html"
@@ -56,16 +68,16 @@ if ! grep -q 'src="/admin/assets/' "$DEST/web/admin/index.html"; then
   exit 1
 fi
 echo "✓ 管理台产物 base 已验证为 /admin/"
-echo "══ [4/4] 编排层源码（Docker 内构建）══"
-rm -rf "$DEST/orchestrator-image/agent-orchestrator"
-cp -r "$BASE/agent-orchestrator" "$DEST/orchestrator-image/agent-orchestrator"
-rm -rf "$DEST/orchestrator-image/agent-orchestrator/.venv" \
-       "$DEST/orchestrator-image/agent-orchestrator/.pytest_cache" \
-       "$DEST/orchestrator-image/agent-orchestrator/.env" \
-       "$DEST/orchestrator-image/agent-orchestrator/.env."*
+echo "══ [4/4] 产物清单校验 ══"
+# 缺少任何一个 jar 都直接失败：以前是「静默少一个 jar，部署后某个服务起不来」
+for j in aismp-backend aismp-gateway aismp-agent aismp-digital-human aismp-orchestrator; do
+  [ -f "$DEST/jars/$j.jar" ] || { echo "✗ 缺 jar：$DEST/jars/$j.jar" >&2; exit 1; }
+done
+[ -f "$DEST/web/portal/portal.js" ] || { echo "✗ 缺门户脚本：$DEST/web/portal/portal.js" >&2; exit 1; }
+echo "✓ 6 个 jar + 门户脚本齐全"
 
 echo ""
 echo "产物就绪："
-du -sh "$DEST/jars" "$DEST/web" "$DEST/orchestrator-image/agent-orchestrator"
+du -sh "$DEST/jars" "$DEST/web"
 # 打包（在原目录的上一级执行，故 tar 的 -C 指向 deploy 的父目录）
 echo "→ 打包上传：tar czf server-docker.tgz -C \"$(dirname "$DEST")\" server-docker && 上传解压"

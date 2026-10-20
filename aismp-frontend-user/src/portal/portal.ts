@@ -13,7 +13,9 @@
   'use strict';
 
   const AUTH_KEY = 'portal_auth';
-  const $ = (id) => document.getElementById(id);
+  // 门户脚本大量直接操作 DOM（value/disabled/dataset/closest），
+  // 元素类型按 any 处理：这里追求的是「类型检查能过、行为一字不改」，不是给 2300 行老代码补 DOM 泛型。
+  const $ = (id: string): any => document.getElementById(id);
   const esc = (s) => String(s == null ? '' : s)
     .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 
@@ -21,7 +23,7 @@
   let NOTICES = [];                // 通知缓存
 
   /* ================= 自诊断：错误不白屏，弹 toast ================= */
-  function toast(msg, type) {
+  function toast(msg: string, type: string = '') {
     try {
       const t = document.createElement('div');
       t.className = 'toast' + (type === 'err' ? ' err' : '');
@@ -30,14 +32,14 @@
       setTimeout(() => t.remove(), 4200);
     } catch (ignored) { /* 自诊断不能再抛错 */ }
   }
-  window.addEventListener('error', (e) => toast('[脚本错误] ' + e.message + ' @' + e.lineno, 'err'));
-  window.addEventListener('unhandledrejection', (e) => toast('[请求异常] ' + (e.reason && e.reason.message ? e.reason.message : e.reason), 'err'));
+  window.addEventListener('error', (e: any) => toast('[脚本错误] ' + e.message + ' @' + e.lineno, 'err'));
+  window.addEventListener('unhandledrejection', (e: any) => toast('[请求异常] ' + (e.reason && e.reason.message ? e.reason.message : e.reason), 'err'));
 
   /* ================= 鉴权 ================= */
   function loadAuth() {
     try { return JSON.parse(localStorage.getItem(AUTH_KEY)) || null; } catch (ignored) { return null; }
   }
-  function showLogin(msg) {
+  function showLogin(msg: string = '') {
     AUTH = null;
     resetScope();
     $('loginErr').textContent = msg || '';
@@ -54,13 +56,14 @@
     loadStats();
     loadNotices();
     // 2026-10-10：未读通知主动弹窗 —— 定时轮询（60s）。只挂一次，避免重复 interval。
-    if (!window.__notifPoll) { window.__notifPoll = setInterval(loadNotices, 60000); }
+    const w = window as any;
+    if (!w.__notifPoll) { w.__notifPoll = setInterval(loadNotices, 60000); }
     loadConversations();
     showView('chat');
     setNavActive('chat');
     resetChat();
   }
-  async function authFetch(url, options) {
+  async function authFetch(url: string, options: RequestInit = {}) {
     const auth = AUTH || loadAuth();
     const resp = await fetch(url, {
       ...(options || {}),
@@ -106,13 +109,13 @@
   ];
   $('loginHint').innerHTML = DEMO_ACCOUNTS
     .map(([u, n]) => '<span class="hint-acc" data-u="' + u + '">' + u + '（' + n + '）</span>').join('');
-  $('loginHint').addEventListener('click', (e) => {
+  $('loginHint').addEventListener('click', (e: any) => {
     const el = e.target.closest('.hint-acc');
     if (!el) return;
     $('loginUser').value = el.dataset.u;
     $('loginPass').value = '123456';
   });
-  $('loginForm').addEventListener('submit', async (e) => {
+  $('loginForm').addEventListener('submit', async (e: any) => {
     e.preventDefault();
     const u = $('loginUser').value.trim();
     const p = $('loginPass').value;
@@ -161,14 +164,14 @@
     $('viewPage').hidden = name !== 'page';
   }
   function setNavActive(view) {
-    document.querySelectorAll('.nav-item').forEach((n) => n.classList.toggle('active', n.dataset.view === view));
+    document.querySelectorAll<HTMLElement>('.nav-item').forEach((n) => n.classList.toggle('active', n.dataset.view === view));
   }
   function handleNav(view) {
     if (view === 'chat') { setNavActive('chat'); showView('chat'); }
     else if (view === 'orders') { setNavActive('orders'); showView('orders'); loadOrders(ordersTab); }
     else if (view === 'terminal') { setNavActive('terminal'); showView('page'); renderBizHub(); }
   }
-  $('nav').addEventListener('click', (e) => {
+  $('nav').addEventListener('click', (e: any) => {
     const el = e.target.closest('.nav-item');
     if (el) handleNav(el.dataset.view);
   });
@@ -188,7 +191,7 @@
     const scope = await visibleWarehouses();
     const codes = scope ? Array.from(scope) : [null];   // null = 无仓库归属账号，取全局
     const snaps = await Promise.all(codes.map((c) =>
-      apiGet('/api/terminal/inventory/snapshot' + (c ? '?warehouseCode=' + encodeURIComponent(c) : ''))));
+      apiGet('/api/terminal/inventory/snapshot' + (c ? '?warehouseCode=' + encodeURIComponent(String(c)) : ''))));
     const sum = (k) => snaps.reduce((acc, d) => acc + (Number(d && d[k]) || 0), 0);
     return { scope, codes, total: sum('totalTerminals'), avail: sum('totalAvailable'),
              aging: sum('longAgingCount'), transit: sum('totalInTransit'),
@@ -226,7 +229,7 @@
     $('quickChips').innerHTML = QUICK.map((c) =>
       '<span class="qchip" data-act="' + c.act + '"><span class="ico">' + c.i + '</span>' + c.t + '</span>').join('');
   }
-  $('quickChips').addEventListener('click', (e) => {
+  $('quickChips').addEventListener('click', (e: any) => {
     const c = e.target.closest('.qchip');
     if (c) quickAction(c.dataset.act);
   });
@@ -255,7 +258,7 @@
     d.innerHTML = items.map((x) =>
       '<span class="qchip" data-act="' + x[1] + '" data-q="' + esc(x[2]) + '"><span class="ico">·</span>' + x[0] + '</span>').join('');
     $('quickChips').after(d);
-    d.addEventListener('click', (e) => {
+    d.addEventListener('click', (e: any) => {
       const c = e.target.closest('.qchip');
       if (!c) return;
       if (c.dataset.act === 'orders') handleNav('orders');
@@ -292,7 +295,7 @@
     }
     aBusy = false;
     const btn = document.getElementById('sendBtn');
-    if (btn) btn.disabled = false;
+    if (btn) (btn as HTMLButtonElement).disabled = false;
   }
 
   // 快捷示例：三条路线各一个
@@ -421,8 +424,8 @@
       item.appendChild(d);
       item.appendChild(acts);
       item.addEventListener('click', () => openConversation(c.conversation_id));
-      bRename.addEventListener('click', (e) => { e.stopPropagation(); startRename(item, c); });
-      bDel.addEventListener('click', (e) => { e.stopPropagation(); deleteConversation(c); });
+      bRename.addEventListener('click', (e: any) => { e.stopPropagation(); startRename(item, c); });
+      bDel.addEventListener('click', (e: any) => { e.stopPropagation(); deleteConversation(c); });
       host.appendChild(item);
     }
   }
@@ -453,8 +456,8 @@
       }
       loadConversations();
     };
-    input.addEventListener('click', (e) => e.stopPropagation());
-    input.addEventListener('keydown', (e) => {
+    input.addEventListener('click', (e: any) => e.stopPropagation());
+    input.addEventListener('keydown', (e: any) => {
       e.stopPropagation();   // 别把按键漏给全局快捷键（如 ⌘K 新建对话）
       if (e.key === 'Enter') finish(true);
       else if (e.key === 'Escape') finish(false);
@@ -591,7 +594,7 @@
       b.className = 'ai-act';
       b.title = title;
       b.textContent = icon;
-      b.addEventListener('click', (ev) => fn(ev.currentTarget, b));
+      b.addEventListener('click', (ev: any) => fn(ev.currentTarget, b));
       return b;
     };
     acts.appendChild(mk('⧉', '复制回答', (btn, el) => {
@@ -622,7 +625,7 @@
     return foot;
   }
 
-  function aAdd(role, html, meta) {
+  function aAdd(role: string, html: string = '', meta: any = null) {
     const d = document.createElement('div');
     d.className = 'msg ' + role;
     if (role === 'a') {
@@ -697,7 +700,7 @@
   function aRenderChips() {
     $('sugChips').innerHTML = SUG_CHIPS.map((c) => '<span class="sug-chip">' + esc(c) + '</span>').join('');
   }
-  $('sugChips').addEventListener('click', (e) => {
+  $('sugChips').addEventListener('click', (e: any) => {
     if (e.target.classList.contains('sug-chip')) aAsk(e.target.textContent);
   });
 
@@ -712,7 +715,7 @@
     $('chatInput').focus();
   }
   $('newChat').addEventListener('click', newChat);
-  document.addEventListener('keydown', (e) => {
+  document.addEventListener('keydown', (e: any) => {
     if ((e.metaKey || e.ctrlKey) && String(e.key).toLowerCase() === 'k') { e.preventDefault(); newChat(); }
   });
 
@@ -722,7 +725,7 @@
     $('chatInput').value = '';
     aAsk(v);
   });
-  $('chatInput').addEventListener('keydown', (e) => {
+  $('chatInput').addEventListener('keydown', (e: any) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
       const v = e.target.value;
@@ -919,7 +922,7 @@
     const draw = (style) => { body.innerHTML = chartBody(style, labels, data); };
     draw(cur);
     if (!metric) {
-      el.querySelector('.chart-switch').addEventListener('click', (e) => {
+      el.querySelector('.chart-switch').addEventListener('click', (e: any) => {
         const btn = e.target.closest('.cs-btn');
         if (!btn) return;
         cur = btn.dataset.style;
@@ -1060,7 +1063,7 @@
   }
 
   /** 行内输入框（可编辑清单用）：平时隐形、悬停/聚焦显形，外观对齐报表式表格。 */
-  function cellInput(val, cls, type) {
+  function cellInput(val: any, cls: string, type: string = 'text') {
     return '<input class="rli ' + cls + '" type="' + (type || 'text') + '" value="'
       + esc(val == null ? '' : String(val)) + '">';
   }
@@ -1208,13 +1211,13 @@
         pop.style.width = Math.max(Math.round(r.width), 280) + 'px';
         pop.querySelectorAll('.wh-pop-i').forEach((row) => {
           // mousedown + preventDefault：抢在 input blur 之前完成选择
-          row.addEventListener('mousedown', (ev) => { ev.preventDefault(); pick(row.dataset.code); });
+          row.addEventListener('mousedown', (ev: any) => { ev.preventDefault(); pick(row.dataset.code); });
         });
       };
       inp.addEventListener('focus', open);
       inp.addEventListener('input', open);
       inp.addEventListener('blur', () => setTimeout(close, 150));
-      inp.addEventListener('keydown', (ev) => { if (ev.key === 'Escape') { close(); inp.blur(); } });
+      inp.addEventListener('keydown', (ev: any) => { if (ev.key === 'Escape') { close(); inp.blur(); } });
     }
     function render() {
       if (!items.length) {
@@ -1246,16 +1249,16 @@
         const q = tr.querySelector('.rq');
         const del = tr.querySelector('.rli-del');
         const apply = tr.querySelector('.rli-apply');
-        if (m) m.addEventListener('input', () => { items[i].model = m.value; });
-        if (q) q.addEventListener('input', () => { items[i].quantity = Number(q.value) || 0; refreshTotal(); });
+        if (m) m.addEventListener('input', () => { items[i].model = (m as HTMLInputElement).value; });
+        if (q) q.addEventListener('input', () => { items[i].quantity = Number((q as HTMLInputElement).value) || 0; refreshTotal(); });
         if (del) del.addEventListener('click', () => { items.splice(i, 1); render(); });
         if (apply) apply.addEventListener('click', () => applyRow(i, apply));
         tr.querySelectorAll('.rwh').forEach((inp) => {
-          bindWhPicker(inp, i, inp.dataset.dir);   // 自绘可搜索下拉（替换原生 datalist）
+          bindWhPicker(inp, i, (inp as HTMLElement).dataset.dir);   // 自绘可搜索下拉（替换原生 datalist）
           inp.addEventListener('change', () => {
-            const code = parseWh(inp.value);
+            const code = parseWh((inp as HTMLInputElement).value);
             if (!code) return;
-            if (inp.dataset.dir === 'from') {
+            if ((inp as HTMLElement).dataset.dir === 'from') {
               items[i].fromWarehouse = code;
               items[i].fromWarehouseName = WH_NAMES[code] || code;
             } else {
@@ -1296,7 +1299,7 @@
       if (!it.fromWarehouse || !it.toWarehouse) { toast('该行缺少调出/调入仓，请用下拉选择', 'err'); return; }
       if (it.fromWarehouse === it.toWarehouse) { toast('调出仓与调入仓不能相同', 'err'); return; }
       const errEl = el.querySelector('[data-err]');
-      if (errEl) errEl.hidden = true;
+      if (errEl) (errEl as HTMLElement).hidden = true;
       btn.disabled = true;
       btn.textContent = '提交中…';
       try {
@@ -1318,7 +1321,7 @@
         render();
       } catch (e) {
         toast('提交失败：' + e.message, 'err');
-        if (errEl) { errEl.textContent = '⚠ ' + e.message; errEl.hidden = false; }
+        if (errEl) { (errEl as HTMLElement).textContent = '⚠ ' + e.message; (errEl as HTMLElement).hidden = false; }
         btn.disabled = false;
         btn.textContent = '申请调拨';
       }
@@ -1390,7 +1393,7 @@
       el.remove();
       if (srcBtn) { srcBtn.disabled = false; srcBtn.textContent = '申请调拨'; }
     });
-    el.querySelector('[data-act="send"]').addEventListener('click', async (ev) => {
+    el.querySelector('[data-act="send"]').addEventListener('click', async (ev: any) => {
       const btn = ev.currentTarget;
       btn.disabled = true;
       btn.textContent = '提交中…';
@@ -1436,7 +1439,7 @@
             .insertAdjacentHTML('beforeend', '<span class="tag tag-red">✕ 发送失败</span>');
         }
         pending.shift();
-        el.dataset.next = idx + 1;
+        el.dataset.next = String(idx + 1);
       }
       loadNotices();
       const dtag = el.querySelector('[data-dtag]');
@@ -1448,7 +1451,7 @@
       } else {
         if (dtag) { dtag.textContent = '已全部发送'; dtag.className = 'tag tag-green'; }
         btn.textContent = '已发送';
-        el.querySelector('[data-act="discard"]').disabled = true;
+        (el.querySelector('[data-act="discard"]') as HTMLButtonElement).disabled = true;
       }
       btn.disabled = true;   // 全部组已处理过，防重复发送
     });
@@ -1589,10 +1592,10 @@
     });
     el.innerHTML = html;
     const openBtn = el.querySelector('#hcOpenChat');
-    if (openBtn) openBtn.onclick = () => aAsk('给我一份补货建议');
+    if (openBtn) (openBtn as HTMLButtonElement).onclick = () => aAsk('给我一份补货建议');
     el.querySelectorAll('.sug-go').forEach((b) =>
       b.addEventListener('click', () => {
-        const t = inflow[Number(b.dataset.i)];
+        const t = inflow[Number((b as HTMLElement).dataset.i)];
         openReplenish({
           fromWarehouse: t.fromWarehouse, fromWarehouseName: t.fromWarehouseName,
           materialCode: t.materialCode, model: t.model, materialName: t.materialName,
@@ -1727,7 +1730,7 @@
     html += '<div class="torder-btns">' + buttonsFor(vo) + '</div>';
     el.innerHTML = html;
     el.querySelectorAll('[data-act]').forEach((b) =>
-      b.addEventListener('click', () => onOrderAction(vo.orderNo, b.dataset.act)));
+      b.addEventListener('click', () => onOrderAction(vo.orderNo, (b as HTMLElement).dataset.act)));
     return el;
   }
   function refreshOrders(vo) {
@@ -1819,7 +1822,7 @@
             preview.textContent = '生成失败：' + e.message;
           }
         };
-        box.querySelector('#mSnFile').addEventListener('change', (ev) => {
+        box.querySelector('#mSnFile').addEventListener('change', (ev: any) => {
           const f = ev.target.files && ev.target.files[0];
           if (!f) return;
           const reader = new FileReader();
@@ -1930,9 +1933,9 @@
       + '<div class="right"><span class="tag ' + (STATUS_CLS[st] || 'tag-gray') + '">' + esc(STATUS_LABEL[st] || st) + '</span>'
       + '<div style="margin-top:6px">' + fmtTime(r.createdAt) + '</div></div></div>';
   }
-  async function loadOrders(tab) {
+  async function loadOrders(tab: string = '') {
     ordersTab = tab || ordersTab;
-    document.querySelectorAll('#ordersTabs .tab').forEach((t) => t.classList.toggle('active', t.dataset.tab === ordersTab));
+    document.querySelectorAll<HTMLElement>('#ordersTabs .tab').forEach((t) => t.classList.toggle('active', t.dataset.tab === ordersTab));
     $('ordersDetail').innerHTML = '';
     const host = $('ordersList');
     if (!AUTH) { host.innerHTML = '<div class="olist-empty">请先登录</div>'; return; }
@@ -2024,7 +2027,7 @@
       host.innerHTML = '<div class="olist-empty">详情加载失败：' + esc(e.message) + '</div>';
     }
   }
-  $('ordersTabs').addEventListener('click', (e) => {
+  $('ordersTabs').addEventListener('click', (e: any) => {
     const t = e.target.closest('.tab');
     if (t) loadOrders(t.dataset.tab);
   });
@@ -2297,7 +2300,7 @@
       }
     };
     $('qBtn').onclick = run;
-    $('qInput').addEventListener('keydown', (e) => { if (e.key === 'Enter') run(); });
+    $('qInput').addEventListener('keydown', (e: any) => { if (e.key === 'Enter') run(); });
   }
 
   /* ================= 弹窗 ================= */
@@ -2310,7 +2313,7 @@
     if (first) first.focus();
   }
   function closeModal() { $('modalMask').hidden = true; $('modalBox').innerHTML = ''; }
-  $('modalMask').addEventListener('click', (e) => { if (e.target === $('modalMask')) closeModal(); });
+  $('modalMask').addEventListener('click', (e: any) => { if (e.target === $('modalMask')) closeModal(); });
 
   /* ================= 启动 ================= */
   renderQuick();
@@ -2322,3 +2325,6 @@
     else showLogin();
   })();
 })();
+// 作为模块收尾：isolatedModules 要求每个文件必须是模块；
+// 构建产物仍是 IIFE（vite.portal.config.ts 的 formats: ["iife"]），portal.html 用普通 <script> 加载。
+export {};
