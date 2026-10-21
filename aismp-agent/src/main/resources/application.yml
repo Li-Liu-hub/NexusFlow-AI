@@ -105,3 +105,20 @@ business:
 #   本服务只提供原子能力 POST /terminal/stockAlert/scan（查+判定）与
 #   POST /transferOrder/notice（写通知，去重）；定时触发不再由本服务承担。
 #   编排层周期配置见 aismp-orchestrator 的 orchestrator.alert.interval-seconds（默认 600 秒）。
+# 混合检索（多查询扩展 + 向量/关键词双路 + RRF + Rerank）
+# 任一层都可单独关闭，回到单路向量检索；rerank 需要 SILICONFLOW_API_KEY
+kb:
+  hybrid:
+    enabled: ${KB_HYBRID_ENABLED:true}
+    multi-query: ${KB_MULTI_QUERY:3}
+    rrf-k: 60
+    candidates: 20
+    top-k: 5
+    vector-weight: 1.0
+    keyword-weight: 1.0
+    rerank:
+      enabled: ${KB_RERANK_ENABLED:true}
+      base-url: https://api.siliconflow.cn
+      model: ${KB_RERANK_MODEL:BAAI/bge-reranker-v2-m3}
+      api-key: ${SILICONFLOW_API_KEY:}
+      timeout-seconds: 3

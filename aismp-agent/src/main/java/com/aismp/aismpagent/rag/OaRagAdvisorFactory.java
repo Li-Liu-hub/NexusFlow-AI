@@ -9,7 +9,7 @@ import org.springframework.ai.rag.advisor.RetrievalAugmentationAdvisor;
 // Spring AI 空上下文兜底增强器
 import org.springframework.ai.rag.generation.augmentation.ContextualQueryAugmenter;
 // Spring AI 基于向量存储的文档检索器
-import org.springframework.ai.rag.retrieval.search.VectorStoreDocumentRetriever;
+import org.springframework.ai.rag.retrieval.search.DocumentRetriever;
 // Spring AI 向量存储抽象接口
 import org.springframework.ai.vectorstore.VectorStore;
 // Spring 组件注解
@@ -33,6 +33,10 @@ public class OaRagAdvisorFactory {
     @Resource
     private OaRagQueryTransformer oaRagQueryTransformer;
 
+    // 混合检索版文档检索器（替代单路向量检索）
+    @Resource
+    private HybridDocumentRetriever hybridDocumentRetriever;
+
     /**
      * 创建 OA 智能客服的 RAG Advisor
      * 管道流程：查询重写+分类 → 向量检索（带元数据过滤）→ 空上下文兜底
@@ -40,18 +44,12 @@ public class OaRagAdvisorFactory {
     public RetrievalAugmentationAdvisor create() {
         // 【诊断日志】证明 create() 被调用（initChatClient 阶段）
         log.info(">>> [诊断] OaRagAdvisorFactory.create() 开始组装 RAG 管道");
-        // 文档检索器：从 PGVector 检索
-        // 不设静态 filter——filter 从 Query context 动态获取（由 OaRagQueryTransformer 注入）
-        VectorStoreDocumentRetriever documentRetriever = VectorStoreDocumentRetriever.builder()
-                // 向量存储（PGVector）
-                .vectorStore(vectorStore)
-                // 相似度阈值：0.5 → 0.25（2026-10-01 服务器实测：查询与目标文档的真实
-                // 相似度 0.7272 却拒答，先用低阈值做二分诊断——若命中则是阈值问题，
-                // 若仍拒答则是 advisor 链没执行，问题在更上游）
-                .similarityThreshold(0.25)
-                // 返回 top 5 篇文档
-                .topK(5)
-                .build();
+        // 文档检索器：混合检索（多查询扩展 → 向量 + 关键词 → RRF → Rerank）
+        // 为什么不再直接用 VectorStoreDocumentRetriever：单路向量对「型号编码/专有名词」
+        // 这类字面匹配召回不稳，且只有一个查询视角。混合检索在 HybridRetrievalService 里，
+        // 任一层失败都会自行降级，最终仍能返回结果。
+        // 分类过滤（category in [...]）由查询转换器注入 Query.context，由 HybridDocumentRetriever 透传。
+        DocumentRetriever documentRetriever = hybridDocumentRetriever;
 
         // 空上下文增强器：检索为空时的兜底处理
         // allowEmptyContext=false → 检索为空时指示模型不要回答（防止瞎编）

@@ -90,6 +90,10 @@ public class OaAgent extends ToolCallAgent {
     // 当前轮次的原始用户消息（RAG 增强前的文本，保存到 ChatMemory 时用）
     private String originalUserPrompt;
 
+    // 混合检索（多查询 + 关键词双路 + RRF + Rerank）；无分类过滤时走它
+    @Resource
+    private com.aismp.aismpagent.rag.HybridRetrievalService hybridRetrieval;
+
     /**
      * 构造函数 —— Spring 自动注入所有工具和 ChatModel
      */
@@ -241,31 +245,24 @@ public class OaAgent extends ToolCallAgent {
         String filterExpr = (String) transformedQuery.context()
                 .get(VectorStoreDocumentRetriever.FILTER_EXPRESSION);
 
-        // 3. 构建向量检索请求
-        SearchRequest.Builder searchBuilder = SearchRequest.builder()
-                .query(transformedQuery.text())
-                .topK(5)
-                .similarityThreshold(0.5);
-
-        // 如果有分类过滤条件，添加到检索请求
+        // 3. 取检索结果
+        List<String> passages;
+        // 分类过滤（category in [...]）直接透传给混合检索：
+        // 向量路走 SQL 过滤，关键词路按同口径收口，两路都不会越过分区
+        passages = hybridRetrieval.search(transformedQuery.text(), filterExpr);
         if (filterExpr != null && !filterExpr.isEmpty()) {
-            searchBuilder.filterExpression(filterExpr);
+            log.info("Agent RAG 预处理：分类过滤 {}", filterExpr);
         }
 
-        // 4. 执行向量检索
-        List<Document> documents = vectorStore.similaritySearch(searchBuilder.build());
-
-        // 5. 检查检索结果
-        if (documents == null || documents.isEmpty()) {
+        // 4. 检查检索结果
+        if (passages.isEmpty()) {
             log.info("Agent RAG 预处理：无匹配文档，使用原始用户消息");
             return userPrompt;
         }
 
-        // 6. 拼接知识库上下文到用户消息
-        log.info("Agent RAG 预处理：匹配到 {} 篇文档", documents.size());
-        String context = documents.stream()
-                .map(Document::getText)
-                .collect(Collectors.joining("\n\n---\n\n"));
+        // 5. 拼接知识库上下文到用户消息
+        log.info("Agent RAG 预处理：匹配到 {} 段", passages.size());
+        String context = String.join("\n\n---\n\n", passages);
 
         return "以下是从知识库检索到的相关文档，请基于这些内容回答用户问题：\n\n" +
                 "【知识库上下文】\n" + context + "\n\n" +
