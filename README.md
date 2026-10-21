@@ -41,32 +41,49 @@ REJECTED（已锁定量放回可用量）
 
 ## 二、架构
 
+```mermaid
+flowchart TB
+    subgraph CLIENT["浏览器"]
+        P["业务门户<br/>portal.html + portal.ts（构建成 IIFE）"]
+        A["管理台<br/>React 18 + TypeScript"]
+    end
+
+    N["nginx :80 · 唯一对外端口<br/>/ → 门户　/admin/ → 管理台　/api/** → 网关"]
+
+    G["aismp-gateway :8090 · Spring Cloud Gateway<br/>剥离伪造身份头 → 注入真实身份 → interface_info 匹配 → 限流 → 计量"]
+
+    BE["aismp-backend :7529<br/>用户 / 接口元数据 / 配额 / 租户 / 审计"]
+    AG["aismp-agent :8124<br/>库存聚合 / 调拨状态机 / 告警扫描 / RAG / 工具"]
+    DH["aismp-digital-human :8126<br/>数字员工内核：装配（人设·技能·知识库·工具）+ ReAct"]
+    OR["aismp-orchestrator :8125<br/>Spring AI Alibaba Graph：路由 / 取数 / 算法 / 质检"]
+
+    MY[("MySQL api_db<br/>平台 + 多租户 + 终端库存")]
+    PG[("PostgreSQL terminal_kb<br/>pgvector 1024 维 + 会话/画布")]
+    RD[("Redis<br/>会话令牌 / nonce 防重放")]
+    MQ[("RabbitMQ<br/>计量异步落库")]
+
+    P --> N
+    A --> N
+    N --> G
+    G -->|"/api/admin/**"| BE
+    G -->|"/api/terminal/** · /api/transferOrder/**"| AG
+    G -->|"/api/agent/**"| DH
+    G -->|"/api/orchestrator/**"| OR
+    OR -->|"① 服务账号登录换 Bearer<br/>② 经网关取库存（不直连 agent）"| G
+    OR -->|"kb 路线：chat 内核拿回答"| DH
+    AG --> MY
+    AG --> PG
+    AG --> RD
+    AG --> MQ
+    DH --> MY
+    DH -->|"知识库写入：/inner/kb/ingest"| AG
+    BE --> MY
+    G --> RD
+    G --> MQ
 ```
-浏览器（业务门户 / 管理台）
-        │
-        ▼
-┌────────────────────────────────────────────────────┐
-│  nginx :80   唯一对外端口                           │
-│  /  → 门户静态页      /admin/ → 管理台              │
-│  /api/** → 网关                                    │
-└────────────────────────────────────────────────────┘
-        │
-        ▼
-┌────────────────────────────────────────────────────┐
-│  aismp-gateway :8090   Spring Cloud Gateway        │
-│  ① 剥离客户端伪造身份头 → ② 注入真实身份            │
-│  ③ interface_info 精确匹配 → ④ 限流 → ⑤ 计量       │
-└────────────────────────────────────────────────────┘
-        │
-        ├─► /api/terminal/**、/api/transferOrder/** → aismp-agent :8124
-        │      库存聚合 / 调拨状态机 / 告警扫描 / RAG / 工具
-        │
-        ├─► /api/agent/**                           → aismp-digital-human :8126
-        │      数字员工内核：装配（角色/技能/知识库/工具）+ ReAct
-        │
-        └─► /api/orchestrator/**                    → aismp-orchestrator :8125
-               Spring AI Alibaba Graph 编排：只管路由与质检
-```
+
+> 两个「不直连」的约定：**编排层取库存必须过网关**（业务接口在网关上做身份注入与登记，
+> 直连 agent 会返回 `code:50000`）；**内核写知识库要回调 agent**（切片与嵌入只有 agent 有）。
 
 **模块**：
 
@@ -85,15 +102,25 @@ Redis 8（会话 / nonce 防重放 / 建议缓存）、RabbitMQ 4（计量异步
 
 ---
 
-## 三、编排层与迁移状态
+## 三、编排层（三条路线）
 
 拓扑在 `aismp-orchestrator/.../graph/OrchestratorGraphConfig.java`：
 
-| 路线 | 节点序列 | 状态 |
+```mermaid
+flowchart LR
+    S["supervise<br/>意图路由"] -->|kb| K[kb] --> R[respond]
+    S -->|replenish| F[fetch] --> AL[algorithm] --> RP[report] --> V[verify_numbers] --> C[critic]
+    C -->|"通过"| R
+    C -.->|"数字对不上<br/>回炉一次"| AL
+    S -->|chart| CP[chart_plan] --> CB[chart_build] --> R
+    S -->|"order / 未识别"| R
+```
+
+| 路线 | 节点序列 | 关键实现 |
 |---|---|---|
-| `kb` 知识问答 | `supervise → kb → respond` | ✅ |
-| `replenish` 补仓调拨 | `supervise → fetch → algorithm → report → verify_numbers → critic → respond` | ✅ 含回炉环（自检不过重算一次） |
-| `chart` 图表 | `supervise → chart_plan → chart_build → respond` | ✅ 五维度 × 四样式 |
+| `kb` 知识问答 | `supervise → kb → respond` | 转发内核（ReAct + 知识检索工具），见第五节 |
+| `replenish` 补仓调拨 | `supervise → fetch → algorithm → report → verify_numbers → critic → respond` | `ReplenishAlgorithm`（纯函数）+ 数字闸门，回炉上限 1 次 |
+| `chart` 图表 | `supervise → chart_plan → chart_build → respond` | 5 维度 × 4 样式，规则优先选型、LLM 兜底 |
 
 - 状态契约在 `graph/StateKeys.java`，字段名与前端消费的 result 载荷一致。
 - SSE 五种帧固定：`start / progress / agent_step / error / result`；前端与网关不感知实现语言。
@@ -121,7 +148,66 @@ API 调用工具按身份校验接口白名单，越权直接拒。
 
 ---
 
-## 五、多租户（公司）模型
+## 五、检索增强（RAG）
+
+知识问答复用 **aismp-agent 的 RAG**，内核不另建一套检索 —— 它把「问知识库」做成一个**可挂载的工具**
+（`searchHandbook`，类型 `KB_RETRIEVAL`）。这样做的好处是写入方与检索方同构：
+同一个 `PgVectorStore`、同一套 metadata，不会出现「切片按 A 规则、召回按 B 规则」。
+
+### 写入：管理台上传知识库
+
+```mermaid
+flowchart LR
+    U["管理台 · 知识库页<br/>上传 .md/.txt/.pdf（≤10MB）"] --> KA["digital-human<br/>KbAdminController"]
+    KA -->|"AgentKbClient<br/>POST /inner/kb/ingest"| ING["aismp-agent<br/>InnerKbController"]
+    ING --> CH["按 chunk_size 切分<br/>默认 800 字（库级可配，≥100）"]
+    CH --> EM["硅基流动 BAAI/bge-m3<br/>1024 维"]
+    EM --> VS[("pgvector · vector_store<br/>metadata: document_id / knowledge_base_id / chunk_index")]
+    ING -->|"chunkCount + embeddingModel"| KA
+    KA --> DOC[("a_knowledge_document<br/>status=READY")]
+```
+
+### 读取：对话时的检索
+
+```mermaid
+flowchart LR
+    Q["用户提问<br/>（门户 → 网关）"] --> OR["orchestrator · supervise<br/>route=kb"]
+    OR --> KN["KbNode"]
+    KN -->|"chat(terminal_manager)"| KER["内核 · ReAct<br/>装配：人设 + 技能 + 知识库 + 工具"]
+    KER -->|"决定要查手册"| TOOL["searchHandbook<br/>KnowledgeRetrievalToolCallback"]
+    TOOL -->|"网关 AK/SK 签名<br/>POST /oa/chat/sync"| G["aismp-gateway"]
+    G --> RAGAPI["aismp-agent<br/>VectorStore.similaritySearch"]
+    RAGAPI --> VS[("vector_store<br/>topK=5 · 阈值 0.5")]
+    VS --> CTX["命中的片段拼进上下文"]
+    CTX --> KER
+    KER -->|"模型生成回答"| SSE["SSE 五帧回流门户"]
+```
+
+### 关键参数
+
+| 参数 | 值 | 在哪 |
+|---|---|---|
+| 嵌入模型 | `BAAI/bge-m3`（1024 维） | `aismp-agent/application.yml`（硅基流动） |
+| 向量列 | `vector_store.embedding vector(1024)` | `db/pg/01-schema-terminal_kb.sql` |
+| 切片长度 | 默认 800 字符，库级可配（≥100） | `a_knowledge_base.chunk_size` |
+| 检索条数 | topK = 5 | `SearchKnowledgeBaseTool` |
+| 相似度阈值 | 0.5 | 同上 |
+| 上传限制 | 单文件 ≤ 10MB | `KbAdminController` |
+| 工具登记 | `searchHandbook`（KB_RETRIEVAL） | `a_llm_tool.config_json` |
+
+### 几个取舍
+
+- **嵌入必须外接**：对话模型 MiMo 只提供 chat / asr / tts，没有 embedding 接口。
+- **检索是工具调用，不是前置 RAG**：内核按需决定查不查（闲聊、复述类问题不查），
+  避免把无关片段硬塞进上下文 —— 也是「能用 workflow 就不堆 context」的同一条原则。
+- **数字问题不走 RAG**：库存/补货/图表走第三节的算法路线，知识库只答「流程该怎么走」。
+- **已知历史包袱**：`searchHandbook.config_json` 里的 `endpoint` 仍是 `/oa/chat/sync`
+  （OA 场景留下的路径名，语义上就是 agent 的 RAG 入口）。改名要同时动库里配置与 agent 路由，
+  收益只是好看，暂不改。
+
+---
+
+## 六、多租户（公司）模型
 
 数据模型已落地（`db/mysql/05-tenant-schema.sql`），口径复用库里既有的 `ent_code`：
 
@@ -141,9 +227,9 @@ API 调用工具按身份校验接口白名单，越权直接拒。
 
 ---
 
-## 六、快速开始
+## 七、快速开始
 
-### 6.1 容器化部署
+### 7.1 容器化部署
 
 ```bash
 bash deploy/server-docker/collect-artifacts.sh   # ① 构建 5 个 jar + 前端产物（含门户脚本）
@@ -154,7 +240,7 @@ bash scripts/deploy.sh                           # ③ 服务器铺配置、起�
 > `collect-artifacts.sh` 结束时校验 **6 个产物**（5 个 jar + 门户脚本），缺任何一个直接失败 ——
 > 以前是静默少包，部署后才发现某个服务起不来。
 
-### 6.2 本机
+### 7.2 本机
 
 ```bash
 # 建库（结构 + 配置种子，不含业务数据）
@@ -171,7 +257,7 @@ bash scripts/start-all.sh --stop  # 停
 `scripts/start-all.sh` 已封装本机三个必做动作：`unset SERVER_PORT/SERVER__PORT`（会劫持 `server.port`）、
 `ESBUILD_BINARY_PATH` 指到 ASCII 路径（中文路径下的 esbuild 被安全软件拦）、清 `NODE_OPTIONS`。
 
-### 6.3 环境变量
+### 7.3 环境变量
 
 ```bash
 # Java 侧
@@ -189,7 +275,7 @@ export DIGITAL_HUMAN_DIRECT_URL="http://127.0.0.1:8126"
 
 ---
 
-## 七、测试
+## 八、测试
 
 ```bash
 bash scripts/test-all.sh          # 全量门禁，失败非零退出
@@ -208,7 +294,7 @@ bash scripts/test-all.sh --no-db  # 跳过需要 MySQL 的那步
 
 ---
 
-## 八、目录结构
+## 九、目录结构
 
 ```
 NexusFlow-AI/
@@ -226,7 +312,7 @@ NexusFlow-AI/
 
 ---
 
-## 九、开发约定
+## 十、开发约定
 
 - 密钥（API Key / `.env` / 令牌 / 凭据）**不进仓库**，`.gitignore` 已覆盖
 - 提交信息说清「做了什么」，中文即可
@@ -236,7 +322,7 @@ NexusFlow-AI/
 
 ---
 
-## 十、常见问题
+## 十一、常见问题
 
 | 症状 | 原因 | 解法 |
 |---|---|---|
@@ -251,7 +337,7 @@ NexusFlow-AI/
 
 ---
 
-## 十一、参与贡献（欢迎 Issue / PR）
+## 十二、参与贡献（欢迎 Issue / PR）
 
 本项目是**比赛演示项目**，但它不是玩具仓库：欢迎任何形式的反馈 —— 发现 bug、文档写错、
 觉得某个设计站不住脚，都可以直接开 Issue；想动手改，随时提 PR。
@@ -281,6 +367,6 @@ NexusFlow-AI/
 
 ---
 
-## 十二、License
+## 十三、License
 
 见根目录 `LICENSE`。
