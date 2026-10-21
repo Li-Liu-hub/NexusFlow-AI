@@ -1,19 +1,12 @@
 package com.aismp.orchestrator.api;
 
-import com.aismp.orchestrator.client.DigitalHumanClient;
+import com.aismp.orchestrator.TestGraphs;
 import com.aismp.orchestrator.config.OrchestratorProperties;
-import com.aismp.orchestrator.graph.GraphStateConfig;
-import com.aismp.orchestrator.graph.OrchestratorGraphConfig;
-import com.aismp.orchestrator.graph.nodes.KbNode;
-import com.aismp.orchestrator.graph.nodes.RespondNode;
-import com.aismp.orchestrator.graph.nodes.SuperviseNode;
-import com.aismp.orchestrator.llm.LlmRouter;
 import com.alibaba.cloud.ai.graph.CompiledGraph;
 import org.junit.jupiter.api.Test;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
-import org.springframework.web.client.RestClient;
 
 import java.nio.charset.StandardCharsets;
 
@@ -34,17 +27,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 class ChatControllerTest {
 
     private static CompiledGraph graph() throws Exception {
-        OrchestratorProperties props = new OrchestratorProperties(); // 无 Key、无服务账号 → 全降级
-        RestClient.Builder builder = RestClient.builder();
-        LlmRouter router = new LlmRouter(props, query -> {
-            throw new IllegalStateException("本测试不应调用 LLM");
-        });
-        DigitalHumanClient client = new DigitalHumanClient(props, builder);
-        return new OrchestratorGraphConfig().orchestratorGraph(
-                new GraphStateConfig().keyStrategyFactory(),
-                new SuperviseNode(router),
-                new KbNode(client, props),
-                new RespondNode());
+        // 无 Key、无服务账号、终端接口不可达 → 全降级路径
+        return TestGraphs.build(new OrchestratorProperties());
     }
 
     @Test

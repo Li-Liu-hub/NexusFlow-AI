@@ -91,13 +91,13 @@ Redis 8（会话 / nonce 防重放 / 建议缓存）、RabbitMQ 4（计量异步
 
 | 路线 | 节点序列 | 状态 |
 |---|---|---|
-| `kb` 知识问答 | `supervise → kb → respond` | ✅ 已实现 |
-| `replenish` 补仓调拨 | `supervise → fetch → algorithm → report → verify_numbers → critic → respond` | 待迁（含回炉环） |
-| `chart` 图表 | `supervise → chart_plan → chart_build → respond` | 待迁 |
+| `kb` 知识问答 | `supervise → kb → respond` | ✅ |
+| `replenish` 补仓调拨 | `supervise → fetch → algorithm → report → verify_numbers → critic → respond` | ✅ 含回炉环（自检不过重算一次） |
+| `chart` 图表 | `supervise → chart_plan → chart_build → respond` | ✅ 五维度 × 四样式 |
 
 - 状态契约在 `graph/StateKeys.java`，字段名与前端消费的 result 载荷一致。
 - SSE 五种帧固定：`start / progress / agent_step / error / result`；前端与网关不感知实现语言。
-- 未实现的路线由 `RespondNode` 明确回「该路线尚未迁移」，**不用空回答冒充正常结果**。
+- 三条路线共用同一套状态契约与 SSE 帧；未识别的意图收口到 `respond`，给一句人话而不是空白。
 - 路由：带 `suggestion_id` 时直达建单（协议动作，不烧 LLM）；否则问一次模型做意图分类，
   解析失败重试 3 次后降级 `kb` —— 宁可回答得泛，也不给用户丢一个 error 帧。
 
@@ -198,7 +198,7 @@ bash scripts/test-all.sh --no-db  # 跳过需要 MySQL 的那步
 
 | 步骤 | 覆盖 | 结果 |
 |---|---|---|
-| `aismp-orchestrator` | 图拓扑 / 路由解析与降级 / 内核客户端 / SSE 五帧 | **32 passed** |
+| `aismp-orchestrator` | 图拓扑 / 路由与降级 / 补货算法 / 数字闸门 / 图表选型 / 可见范围 / SSE 帧 | **75 passed** |
 | `db/mysql/verify-tenant-schema.sh` | 迁移幂等 + 结构 + 种子 + 中文 UTF-8 | **16 项** |
 | `aismp-frontend-admin` | `tsc --noEmit` + 登录态 / 请求封装 | **21 passed** |
 | `aismp-frontend-user` | `tsc --noEmit` | 通过 |

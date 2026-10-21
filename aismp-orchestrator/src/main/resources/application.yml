@@ -25,6 +25,12 @@ orchestrator:
     base-url: ${LLM_BASE_URL:https://api.z.ai/api/coding/paas/v4}
     api-key: ${LLM_API_KEY:}
     model: ${LLM_MODEL:glm-5.2}
+  # 终端业务接口（aismp-agent）—— 补货与图表路线的取数源
+  terminal:
+    base-url: ${TERMINAL_BASE_URL:http://127.0.0.1:8090}
+    root-warehouse: ${TERMINAL_ROOT_WAREHOUSE:9B00}
+    warehouses: ${TERMINAL_WAREHOUSES:9B00,9BZA,9BZA01,9BZA02,9BZA03,9BZA04}
+
   digital-human:
     direct-url: ${DIGITAL_HUMAN_DIRECT_URL:http://127.0.0.1:8126}
     agent-code: ${DIGITAL_HUMAN_AGENT_CODE:terminal_manager}
