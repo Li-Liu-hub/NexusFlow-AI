@@ -23,6 +23,13 @@ public final class StateKeys {
 
     // ---- kb 通道 ----
     public static final String REWRITTEN_QUERY = "rewritten_query";
+    // ---- 补货路线（replenish）----
+    public static final String INVENTORY_SNAPSHOT = "inventory_snapshot";
+    public static final String ALGO_RESULT = "algo_result";
+
+    // ---- 图表路线（chart）----
+    public static final String CHART_PLAN = "chart_plan";
+
     public static final String AGENT_RESPONSE = "agent_response";
 
     // ---- replenish 通道 ----
@@ -36,9 +43,16 @@ public final class StateKeys {
     // ---- 元信息（MergeStrategy：多节点写不丢 key）----
     public static final String META = "meta";
 
-    // ---- 节点 id（与画布 DSL / orch_node_def 的 node id 保持一致）----
+    // ---- 节点 id（与画布 DSL / orch_node_def 的 node_key 逐字一致）----
     public static final String NODE_SUPERVISE = "supervise";
     public static final String NODE_KB = "kb";
+    public static final String NODE_FETCH = "fetch";
+    public static final String NODE_ALGORITHM = "algorithm";
+    public static final String NODE_REPORT = "report";
+    public static final String NODE_VERIFY = "verify_numbers";
+    public static final String NODE_CRITIC = "critic";
+    public static final String NODE_CHART_PLAN = "chart_plan";
+    public static final String NODE_CHART_BUILD = "chart_build";
     public static final String NODE_RESPOND = "respond";
 
     // ---- 路线名 ----

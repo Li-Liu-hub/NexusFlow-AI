@@ -279,6 +279,8 @@ services:
       LLM_MODEL: mimo-v2.6-flash
       # 容器里 127.0.0.1 是本容器回环，必须写服务名
       DIGITAL_HUMAN_DIRECT_URL: http://digital-human:8126
+      # 补货/图表路线的取数源（aismp-agent）；容器里必须写服务名
+      TERMINAL_BASE_URL: http://gateway:8090
       # 服务账号用于 /auth/login 换内核令牌（口令只从 .env 注入，不进仓库）
       ORCH_SVC_USER: svc_orchestrator
       ORCH_SVC_PASSWORD: ${ORCH_SVC_PASSWORD}

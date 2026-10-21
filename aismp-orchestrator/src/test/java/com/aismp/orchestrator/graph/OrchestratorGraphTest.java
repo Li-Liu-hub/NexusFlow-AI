@@ -1,17 +1,12 @@
 package com.aismp.orchestrator.graph;
 
-import com.aismp.orchestrator.client.DigitalHumanClient;
+import com.aismp.orchestrator.TestGraphs;
 import com.aismp.orchestrator.config.OrchestratorProperties;
-import com.aismp.orchestrator.graph.nodes.KbNode;
-import com.aismp.orchestrator.graph.nodes.RespondNode;
-import com.aismp.orchestrator.graph.nodes.SuperviseNode;
-import com.aismp.orchestrator.llm.LlmRouter;
 import com.alibaba.cloud.ai.graph.CompiledGraph;
 import com.alibaba.cloud.ai.graph.NodeOutput;
 import com.alibaba.cloud.ai.graph.RunnableConfig;
 import com.alibaba.cloud.ai.graph.StateGraph;
 import org.junit.jupiter.api.Test;
-import org.springframework.web.client.RestClient;
 
 import java.util.HashMap;
 import java.util.List;
@@ -32,18 +27,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 class OrchestratorGraphTest {
 
     private CompiledGraph buildGraph() throws Exception {
-        OrchestratorProperties props = new OrchestratorProperties(); // 默认值：无 Key、无服务账号
-        RestClient.Builder builder = RestClient.builder();
-
-        // 路由通道用桩子：本测试只关心图拓扑与降级，不碰网络
-        LlmRouter router = new LlmRouter(props, query -> { throw new IllegalStateException("不该被调用"); });
-        DigitalHumanClient client = new DigitalHumanClient(props, builder);
-
-        return new OrchestratorGraphConfig().orchestratorGraph(
-                new GraphStateConfig().keyStrategyFactory(),
-                new SuperviseNode(router),
-                new KbNode(client, props),
-                new RespondNode());
+        // 默认配置等价于「两个外部依赖全挂」：无 LLM Key、无服务账号、终端接口不可达
+        return TestGraphs.build(new OrchestratorProperties());
     }
 
     @Test
