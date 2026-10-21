@@ -8,6 +8,7 @@ import org.springframework.ai.tool.annotation.ToolParam;
 import org.springframework.ai.document.Document;
 // Spring AI 向量存储抽象接口
 import org.springframework.ai.vectorstore.SearchRequest;
+import com.aismp.aismpagent.rag.HybridRetrievalService;
 import org.springframework.ai.vectorstore.VectorStore;
 // Spring 组件注解
 import org.springframework.stereotype.Component;
@@ -18,7 +19,6 @@ import lombok.extern.slf4j.Slf4j;
 // Java 列表
 import java.util.List;
 // Java 流式处理
-import java.util.stream.Collectors;
 
 /**
  * 知识库搜索工具（供 OA Agent 调用）
@@ -41,9 +41,13 @@ import java.util.stream.Collectors;
 @Slf4j
 public class SearchKnowledgeBaseTool {
 
-    // 向量存储（PGVector），Spring 自动注入
+    // 向量存储（PGVector）：混合检索关闭或异常时的兜底路径
     @Resource
     private VectorStore vectorStore;
+
+    // 混合检索：多查询扩展 + 关键词路 + RRF + Rerank（见 HybridRetrievalService）
+    @Resource
+    private HybridRetrievalService hybridRetrieval;
 
     /**
      * 搜索 OA 系统知识库
@@ -57,29 +61,25 @@ public class SearchKnowledgeBaseTool {
             // 工具参数：搜索关键词
             @ToolParam(description = "搜索关键词或完整问题，例如：忘记密码怎么办、工单审批流程") String query
     ) {
-        // 打印检索日志
         log.info("Agent 知识库检索：query='{}'", query);
-        // 构建检索请求：相似度阈值 0.5，返回 top 5
-        List<Document> documents = vectorStore.similaritySearch(
-                SearchRequest.builder()
-                        .query(query)
-                        .topK(5)
-                        .similarityThreshold(0.5)
-                        .build()
-        );
-        // 检查检索结果
-        if (documents == null || documents.isEmpty()) {
-            // 无匹配结果
+
+        List<String> passages;
+        try {
+            // 优先走混合检索（多查询 → 双路 → RRF → rerank），任一层失败会自行降级
+            passages = hybridRetrieval.search(query);
+        } catch (RuntimeException e) {
+            // 兜底：混合检索整体异常时回到单路向量检索，保证问答不中断
+            log.warn("混合检索异常，退回单路向量检索：{}", e.getMessage());
+            List<Document> docs = vectorStore.similaritySearch(SearchRequest.builder()
+                    .query(query).topK(5).similarityThreshold(0.5).build());
+            passages = docs == null ? List.of() : docs.stream().map(Document::getText).toList();
+        }
+
+        if (passages.isEmpty()) {
             log.info("Agent 知识库检索：无匹配文档");
             return "未找到相关知识库文档。";
         }
-        // 打印匹配数量
-        log.info("Agent 知识库检索：匹配到 {} 篇文档", documents.size());
-        // 将文档内容拼接成字符串返回给 Agent
-        return documents.stream()
-                // 取每篇文档的文本内容
-                .map(Document::getText)
-                // 用分隔线连接
-                .collect(Collectors.joining("\n\n---\n\n"));
+        log.info("Agent 知识库检索：返回 {} 段", passages.size());
+        return String.join("\n\n---\n\n", passages);
     }
 }
