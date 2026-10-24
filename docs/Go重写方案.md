@@ -15,7 +15,8 @@
 | `aismp-backend`（含 `aismp-gateway`） | Java | 79 | 5,477 | 8 | ✅ 计划 |
 | `aismp-agent`（终端业务 + RAG） | Java | 72 | 8,016 | 5 | ✅ 计划 |
 | `aismp-digital-human`（内核） | Java | 56 | 7,328 | 10 | ⚠️ 见 §五 |
-| `agent-orchestrator` | Python | 53 | 9,075 | — | ❌ 不建议 |
+| `agent-orchestrator` | Python | 53 | 9,075 | — | ⚠️ **已删除**（见 §五修正） |
+| `aismp-orchestrator`（Java 图编排，NexusFlow-AI） | Java | 43 | 4,652 | 1 | ⚠️ 新增范围，见 §五 |
 | **小计（服务端）** | | **260** | **29,896** | **23** | |
 | `aismp-frontend-master/admin/user` | JSX | — | — | — | ❌ 不做 |
 
@@ -98,17 +99,26 @@ go/
 
 ---
 
-## 五、Python 编排层：不建议用 Go 重写
+## 五、编排层：Python 已删，现在是 Java（Spring AI Alibaba Graph）
 
-`agent-orchestrator` 9,075 行建立在 **LangGraph** 上（StateGraph、条件边、checkpoint、流式输出、`orch_graph` 版本表 + 会话粘版本）。Go 生态**没有 LangGraph 等价物**。
+> **2026-10-24 修正**：本节初版基于本仓库的旧快照写作（当时 `agent-orchestrator` 还是
+> Python + LangGraph，9,075 行）。实际上编排层已在 **NexusFlow-AI 仓库**完成迁移并上线：
+>
+> - `c41435c` 用 Spring AI Alibaba Graph 重建编排层；`a63ee09` 删除 Python 层；
+>   `05053ad` replenish / chart 两条路线迁入 Java 图
+> - 新的 `aismp-orchestrator`：**43 个 Java 文件 / 4,652 行**，节点含
+>   Kb / ChartPlan / ChartBuild / Fetch / Algorithm / Critic / Supervise /
+>   VerifyNumbers / Report / Respond（见 `graph/nodes/`）
+> - 服务器 2026-10-21 起跑的就是 Java 版：镜像 `jsyl6/ap-orchestrator:20261021-graph4`
+> - 内核（aismp-digital-human）也在 spring-ai-alibaba 2.0.0-M1.1 上（ReactAgent）
 
-三条路，都不便宜：
+对 Go 重构的影响：
 
-1. **自己写状态机**（推荐，如果一定要 Go）——把 `canvas/loader.py` 的 DSL 解释器翻译成 Go，LangGraph 退化成一张有向图 + 显式 state struct。可行，但要重做 checkpoint / 流式 / 中断恢复，约 **2–3 周**。
-2. **保留 Python 编排层**——Go 只吃 3 个 Java 服务和网关，编排仍是独立容器。**这是性价比最高的方案**，代价是内存上只省了 JVM 那部分（已经是大头）。
-3. **砍掉画布**——退回三条硬编码路线（chart / replenish / kb）。省时间但丢功能。
-
-`docs/Dify编排迁移-工程量评估.md` 里已有过同类测算，可对照。
+- Go 生态**同样没有 Spring AI Alibaba Graph 的等价物**——StateGraph、条件边、
+  SSE 五种事件帧（契约逐字保留、前端零改动）、记忆压缩、graph 版本粘滞，
+  在 Go 里都要手写。原估计不变：**自研状态机约 2–3 周**，且流式契约必须逐帧对照。
+- 编排层现在是一个普通的 Java 服务（不再是「不能动的 Python」），纳入重写范围
+  变为一个新分期（P6 或并入 P3），收益是再省一个 JVM（容器实测约 200–400 MB）。
 
 ---
 
