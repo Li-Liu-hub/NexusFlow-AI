@@ -14,22 +14,25 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"strconv"
+	"strings"
 	"time"
 )
 
 // Quota 对应 a_token_quota 一行（Java 侧 QuotaPO）。
 //
 // scope 决定 target_code 的解释：USER → user_id；AGENT → agent_code；TENANT → ent_code。
-// MonthlyTokens 为 nil 时按 0 写库（=封禁）；JSON 字段名与 Jackson 的驼峰输出一致。
+// MonthlyTokens 为 nil 时按 0 写库（=封禁）；时间字段输出 Jackson LocalDateTime 的形态
+// （"2006-01-02T15:04:05"，无时区后缀）。
 type Quota struct {
-	ID           *int64     `json:"id"`
-	Scope        *string    `json:"scope"`
-	TargetCode   *string    `json:"targetCode"`
-	MonthlyTokens *int64    `json:"monthlyTokens"`
-	Status       *string    `json:"status"`
-	Remark       *string    `json:"remark"`
-	CreateTime   *time.Time `json:"createTime"`
-	UpdateTime   *time.Time `json:"updateTime"`
+	ID            *int64  `json:"id"`
+	Scope         *string `json:"scope"`
+	TargetCode    *string `json:"targetCode"`
+	MonthlyTokens *int64  `json:"monthlyTokens"`
+	Status        *string `json:"status"`
+	Remark        *string `json:"remark"`
+	CreateTime    *string `json:"createTime"`
+	UpdateTime    *string `json:"updateTime"`
 }
 
 // Repository 是用量账本与配额的仓储，SQL 与 TokenUsageRepository.java 逐句对应。
@@ -186,12 +189,12 @@ func scanQuota(scanner interface{ Scan(...any) error }) (*Quota, error) {
 		q.Remark = &s
 	}
 	if createTime.Valid {
-		t := createTime.Time
-		q.CreateTime = &t
+		s := createTime.Time.Format("2006-01-02T15:04:05")
+		q.CreateTime = &s
 	}
 	if updateTime.Valid {
-		t := updateTime.Time
-		q.UpdateTime = &t
+		s := updateTime.Time.Format("2006-01-02T15:04:05")
+		q.UpdateTime = &s
 	}
 	return &q, nil
 }
@@ -368,6 +371,14 @@ func (r *Repository) queryRows(ctx context.Context, query string, args ...any) (
 	if err != nil {
 		return nil, fmt.Errorf("tokenadmin: 读列名失败: %w", err)
 	}
+	types, err := rows.ColumnTypes()
+	if err != nil {
+		return nil, fmt.Errorf("tokenadmin: 读列类型失败: %w", err)
+	}
+	dbTypes := make([]string, len(types))
+	for i, t := range types {
+		dbTypes[i] = strings.ToUpper(t.DatabaseTypeName())
+	}
 	var list []Row
 	for rows.Next() {
 		raw := make([]any, len(cols))
@@ -380,7 +391,7 @@ func (r *Repository) queryRows(ctx context.Context, query string, args ...any) (
 		}
 		row := Row{}
 		for i, c := range cols {
-			row[c] = normalizeDBValue(raw[i])
+			row[c] = normalizeDBValue(raw[i], dbTypes[i])
 		}
 		list = append(list, row)
 	}
@@ -388,12 +399,23 @@ func (r *Repository) queryRows(ctx context.Context, query string, args ...any) (
 }
 
 // normalizeDBValue 把 driver.Value 规整为 Jackson 等价的 JSON 形态。
-func normalizeDBValue(v any) any {
+// dbType 是列的数据库类型名：数值列（SUM 的 DECIMAL、COUNT 的 BIGINT）转 JSON 数字，
+// 字符/日期列保持字符串——Java 的 queryForList 对两类列就是这个区分。
+func normalizeDBValue(v any, dbType string) any {
 	switch t := v.(type) {
 	case nil:
 		return nil
 	case []byte:
-		return string(t)
+		s := string(t)
+		if isNumericDBType(dbType) {
+			if n, err := strconv.ParseInt(s, 10, 64); err == nil {
+				return n
+			}
+			if f, err := strconv.ParseFloat(s, 64); err == nil {
+				return f
+			}
+		}
+		return s
 	case time.Time:
 		// DATE 列的时间部分为零值 → 只输出日期；DATETIME 带时间。
 		if t.Hour() == 0 && t.Minute() == 0 && t.Second() == 0 && t.Nanosecond() == 0 {
@@ -401,7 +423,6 @@ func normalizeDBValue(v any) any {
 		}
 		return t.Format("2006-01-02T15:04:05")
 	case float64:
-		// SUM() 的 DECIMAL 经接口层是 float64；整数化避免 84521.0 这种尾形态。
 		if t == float64(int64(t)) {
 			return int64(t)
 		}
@@ -409,6 +430,19 @@ func normalizeDBValue(v any) any {
 	default:
 		return v
 	}
+}
+
+func isNumericDBType(dbType string) bool {
+	switch {
+	case strings.Contains(dbType, "INT"),
+		strings.Contains(dbType, "DECIMAL"),
+		strings.Contains(dbType, "NUMERIC"),
+		strings.Contains(dbType, "FLOAT"),
+		strings.Contains(dbType, "DOUBLE"),
+		strings.Contains(dbType, "REAL"):
+		return true
+	}
+	return false
 }
 
 func deref[T any](p *T) T {
