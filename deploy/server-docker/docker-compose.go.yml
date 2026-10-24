@@ -1,0 +1,193 @@
+# ============================================================================
+# 全 Go 技术栈（feat/go-rewrite）：零 JVM
+# ============================================================================
+# 变更（相对 docker-compose.full.yml）：
+#   删除：backend/agent/digital-human/orchestrator 四个 JVM 容器 + Nacos（本身是 JVM）
+#        + RabbitMQ（Go 栈计量走直连 HTTP，无 MQ 消费者）
+#   新增：ap-gateway/platform-backend/terminal-agent/kernel/orchestrator 五个 Go 容器
+#        （镜像 = nginx:1.27-alpine 作运行时挂载静态二进制，或 go 自建镜像）
+#   保留：mysql / postgres(pgvector) / redis / nginx（数据与入口不变，前端零改动）
+# ============================================================================
+x-go: &go-defaults
+  restart: unless-stopped
+  networks: [apnet]
+  logging: { driver: json-file, options: { max-size: "10m", max-file: "3" } }
+
+services:
+  mysql:
+    image: mysql:8.4
+    container_name: ap-mysql
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PW}
+      MYSQL_DATABASE: api_db
+    volumes:
+      - mysqldata:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "-p${MYSQL_ROOT_PW}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    networks: [apnet]
+
+  postgres:
+    image: pgvector/pgvector:pg18
+    container_name: ap-postgres
+    environment:
+      POSTGRES_USER: ${PG_USER}
+      POSTGRES_PASSWORD: ${PG_PASSWORD}
+      POSTGRES_DB: terminal_kb
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${PG_USER} -d terminal_kb"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    networks: [apnet]
+
+  redis:
+    image: redis:8-alpine
+    container_name: ap-redis
+    command: ["redis-server", "--requirepass", "${REDIS_PW}", "--maxmemory", "192mb", "--maxmemory-policy", "allkeys-lru", "--appendonly", "no"]
+    healthcheck:
+      test: ["CMD-SHELL", "redis-cli -a ${REDIS_PW} ping | grep PONG"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    networks: [apnet]
+
+  # ---- Go 服务（二进制经 /opt/agent-platform/go-bin 挂载）----
+
+  gateway:
+    <<: *go-defaults
+    image: nginx:1.27-alpine
+    container_name: ap-gateway-go
+    entrypoint: ["/app/gateway"]
+    environment: &go-env
+      MYSQL_DSN: "${MYSQL_APP_USER}:${MYSQL_APP_PW}@tcp(mysql:3306)/api_db?parseTime=true&loc=Local&charset=utf8mb4&timeout=5s"
+      REDIS_ADDR: "redis:6379"
+      REDIS_PW: ${REDIS_PW}
+      BACKEND_URL: "http://backend:7529"
+      AGENT_URL: "http://agent:8124"
+      KERNEL_URL: "http://kernel:8126"
+      ORCHESTRATOR_URL: "http://orchestrator:8125"
+      MOCK_URL: "http://127.0.0.1:8123"
+      PORTAL_ACCESS_KEY: "aismp-console"
+      COUNT_URL: "http://backend:7529/api/inner/userInterfaceInfo/invokeCount"
+      RATE_PER_MINUTE: "600"
+      GATEWAY_SECRET_KEY: ""
+    volumes:
+      - /opt/agent-platform/go-bin:/app:ro
+    mem_limit: 96m
+    ports: []                # 仅内网；nginx 是唯一对外端口
+    depends_on:
+      mysql: { condition: service_healthy }
+      redis: { condition: service_healthy }
+    networks:
+      apnet: { ipv4_address: 172.28.0.11 }
+
+  backend:
+    <<: *go-defaults
+    image: nginx:1.27-alpine
+    container_name: ap-backend
+    entrypoint: ["/app/platform-backend"]
+    environment:
+      <<: *go-env
+      HTTP_ADDR: ":7529"
+      AISMP_CLIENT_ACCESS_KEY: "aismp-console"
+      AISMP_CLIENT_SECRET_KEY: ${GATEWAY_SK}
+      GATEWAY_BASE_URL: "http://gateway:8090"
+      DIGITAL_HUMAN_BASE_URL: "http://kernel:8126"
+    volumes:
+      - /opt/agent-platform/go-bin:/app:ro
+    mem_limit: 96m
+    depends_on:
+      mysql: { condition: service_healthy }
+    networks:
+      apnet: { ipv4_address: 172.28.0.12 }
+
+  agent:
+    <<: *go-defaults
+    image: nginx:1.27-alpine
+    container_name: ap-agent
+    entrypoint: ["/app/terminal-agent"]
+    environment:
+      <<: *go-env
+      HTTP_ADDR: ":8124"
+    volumes:
+      - /opt/agent-platform/go-bin:/app:ro
+    mem_limit: 96m
+    depends_on:
+      mysql: { condition: service_healthy }
+    networks: [apnet]
+
+  kernel:
+    <<: *go-defaults
+    image: nginx:1.27-alpine
+    container_name: ap-kernel
+    entrypoint: ["/app/kernel"]
+    environment:
+      <<: *go-env
+      HTTP_ADDR: ":8126"
+      TERMINAL_DSN: "${MYSQL_APP_USER}:${MYSQL_APP_PW}@tcp(mysql:3306)/terminal_db?parseTime=true&loc=Local&charset=utf8mb4&timeout=5s"
+      API_DSN: "${MYSQL_APP_USER}:${MYSQL_APP_PW}@tcp(mysql:3306)/api_db?parseTime=true&loc=Local&charset=utf8mb4&timeout=5s"
+      PG_DSN: "postgres://${PG_USER}:${PG_PASSWORD}@postgres:5432/terminal_kb?sslmode=disable"
+      LLM_BASE_URL: ${LLM_BASE_URL:-https://api.xiaomimimo.com}
+      MIMO_API_KEY: ${MIMO_API_KEY:-}
+      LLM_MODEL: ${LLM_MODEL:-mimo-v2.6-flash}
+      SILICONFLOW_API_KEY: ${SILICONFLOW_API_KEY:-}
+      BACKEND_BASE_URL: "http://backend:7529/api"
+      AGENT_BASE_URL: "http://agent:8124"
+      GATEWAY_BASE_URL: "http://gateway:8090"
+      GATEWAY_ACCESS_KEY: "aismp-console"
+      GATEWAY_SECRET_KEY: ${GATEWAY_SK}
+      KERNEL_USER: "svc_orchestrator"
+      KERNEL_PASS: ${KERNEL_SVC_PW:-svc-orch-2026}
+    volumes:
+      - /opt/agent-platform/go-bin:/app:ro
+    mem_limit: 128m
+    depends_on:
+      mysql: { condition: service_healthy }
+    networks: [apnet]
+
+  orchestrator:
+    <<: *go-defaults
+    image: nginx:1.27-alpine
+    container_name: ap-orchestrator
+    entrypoint: ["/app/orchestrator"]
+    environment:
+      AGENT_BASE_URL: "http://agent:8124"
+      KERNEL_BASE_URL: "http://kernel:8126"
+      KERNEL_USER: "svc_orchestrator"
+      KERNEL_PASS: ${KERNEL_SVC_PW:-svc-orch-2026}
+      KB_AGENT_CODE: ${KB_AGENT_CODE:-kb_assistant}
+      HTTP_ADDR: ":8125"
+    volumes:
+      - /opt/agent-platform/go-bin:/app:ro
+    mem_limit: 64m
+    depends_on:
+      - kernel
+    networks: [apnet]
+
+  nginx:
+    image: nginx:1.27-alpine
+    container_name: ap-nginx
+    ports: ["80:80"]
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+      - /usr/share/nginx/portal:/usr/share/nginx/html/portal:ro
+      - /usr/share/nginx/admin:/usr/share/nginx/html/admin:ro
+    depends_on:
+      - gateway
+    networks: [apnet]
+
+volumes:
+  mysqldata:
+  pgdata:
+
+networks:
+  apnet:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.28.0.0/16
