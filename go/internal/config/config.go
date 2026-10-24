@@ -109,6 +109,29 @@ func LoadGateway() (GatewayConfig, error) {
 	return c, nil
 }
 
+// LoadWithDefaultAddr 等价 Load，但允许调用方指定 HTTP_ADDR 缺省值
+// （不同服务端口不同：platform-backend :7529 / terminal-agent :8124）。
+func LoadWithDefaultAddr(defaultAddr string) (Config, error) {
+	c := Config{
+		Addr:     getenv("HTTP_ADDR", defaultAddr),
+		MySQLDSN: getenv("MYSQL_DSN", "root:123456@tcp(127.0.0.1:3306)/api_db?parseTime=true&loc=Local&charset=utf8mb4&timeout=5s"),
+
+		ShutdownTimeout: 10 * time.Second,
+		DBMaxOpen:       getenvInt("DB_MAX_OPEN", 20),
+		DBMaxIdle:       getenvInt("DB_MAX_IDLE", 5),
+
+		GatewayBaseURL:            getenv("GATEWAY_BASE_URL", "http://127.0.0.1:8090"),
+		GatewayDigitalHumanPrefix: getenv("DIGITAL_HUMAN_GW_PREFIX", "/digitalHuman/admin"),
+		DigitalHumanBaseURL:       getenv("DIGITAL_HUMAN_BASE_URL", "http://127.0.0.1:8126"),
+		ClientAccessKey:           getenv("AISMP_CLIENT_ACCESS_KEY", "aismp-console"),
+		ClientSecretKey:           getenv("AISMP_CLIENT_SECRET_KEY", "7c1f9a3e5d0b2846af31c7e9b0d45268"),
+	}
+	if c.Addr == "" {
+		return c, fmt.Errorf("config: HTTP_ADDR 不能为空")
+	}
+	return c, nil
+}
+
 func getenvInt(key string, def int) int {
 	v := os.Getenv(key)
 	if v == "" {
