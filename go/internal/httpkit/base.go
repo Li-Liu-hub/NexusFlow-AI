@@ -3,7 +3,11 @@
 // 以及 gin 引擎的公共装配。
 package httpkit
 
-import "net/http"
+import (
+	"crypto/sha256"
+	"encoding/hex"
+	"net/http"
+)
 
 // Code 是业务错误码，取值与 Java 侧 com.aismp.project.common.ErrorCode 一一对应。
 // 改名会破坏前端判断逻辑，不要动数值。
@@ -86,4 +90,11 @@ func Fail(code Code) BaseResponse {
 // FailMsg 在错误码基础上覆盖文案（Java 侧大量 new BaseResponse(code, null, 自定义文案)）。
 func FailMsg(code Code, message string) BaseResponse {
 	return BaseResponse{Code: int(code), Data: nil, Message: message}
+}
+
+// Sign 对齐 SignUtils.getSign：SHA256(body + "." + secretKey) 的小写 hex。
+// 网关验签与客户端签名共用这一条契约；market 包的同名函数是它的别名。
+func Sign(body, secretKey string) string {
+	sum := sha256.Sum256([]byte(body + "." + secretKey))
+	return hex.EncodeToString(sum[:])
 }

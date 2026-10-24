@@ -11,6 +11,8 @@ import (
 	"os"
 	"strconv"
 	"time"
+
+	"github.com/aismp/platform/internal/gateway"
 )
 
 // Config 是 platform-backend 进程的全部可调参数。
@@ -63,6 +65,48 @@ func getenv(key, def string) string {
 		return v
 	}
 	return def
+}
+
+// GatewayConfig 是 gateway 进程的配置。
+type GatewayConfig struct {
+	// Addr 监听地址，对应 server.port: 8090。
+	Addr            string
+	MySQLDSN        string
+	ShutdownTimeout time.Duration
+	DBMaxOpen       int
+	DBMaxIdle       int
+	// Gateway 是过滤器参数。
+	Gateway gateway.Config
+}
+
+// LoadGateway 从环境变量组装网关配置。
+// 上游地址缺省值取本机开发端口，线上由 compose 的 environment 覆盖为服务名。
+func LoadGateway() (GatewayConfig, error) {
+	gw := gateway.Config{
+		BackendURL:      getenv("BACKEND_URL", "http://127.0.0.1:7529"),
+		AgentURL:        getenv("AGENT_URL", "http://127.0.0.1:8127"),
+		KernelURL:       getenv("KERNEL_URL", "http://127.0.0.1:8126"),
+		OrchURL:         getenv("ORCHESTRATOR_URL", "http://127.0.0.1:8125"),
+		MockURL:         getenv("MOCK_URL", "http://127.0.0.1:8123"),
+		PortalAccessKey: getenv("PORTAL_ACCESS_KEY", "aismp-console"),
+		RatePerMinute:   getenvInt("RATE_PER_MINUTE", 600),
+	}
+	c := GatewayConfig{
+		Addr:            getenv("HTTP_ADDR", ":8090"),
+		MySQLDSN:        getenv("MYSQL_DSN", "root:123456@tcp(127.0.0.1:3306)/api_db?parseTime=true&loc=Local&charset=utf8mb4&timeout=5s"),
+		ShutdownTimeout: 10 * time.Second,
+		DBMaxOpen:       getenvInt("DB_MAX_OPEN", 20),
+		DBMaxIdle:       getenvInt("DB_MAX_IDLE", 5),
+		Gateway:         gw,
+	}
+	c.Gateway.MySQLDSN = c.MySQLDSN
+	c.Gateway.Redis.Addr = getenv("REDIS_ADDR", "127.0.0.1:6379")
+	c.Gateway.Redis.Password = getenv("REDIS_PW", "")
+	c.Gateway.CountURL = getenv("COUNT_URL", "")
+	if c.Addr == "" {
+		return c, fmt.Errorf("config: HTTP_ADDR 不能为空")
+	}
+	return c, nil
 }
 
 func getenvInt(key string, def int) int {
