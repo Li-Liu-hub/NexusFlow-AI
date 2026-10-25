@@ -28,16 +28,20 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+
+	"github.com/aismp/platform/internal/canvas"
 )
 
 // Config 编排器参数。
 type Config struct {
-	AgentBaseURL  string // terminal-agent :8124
-	KernelBaseURL string // kernel :8126
-	KernelUser    string // svc_orchestrator
-	KernelPass    string
-	KBAgentCode   string // 知识问答路线的数字员工编码
-	Addr          string
+	AgentBaseURL     string // terminal-agent :8124
+	GatewayAccessKey string // http 节点网关签名
+	GatewaySecretKey string
+	KernelBaseURL    string // kernel :8126
+	KernelUser       string // svc_orchestrator
+	KernelPass       string
+	KBAgentCode      string // 知识问答路线的数字员工编码
+	Addr             string
 }
 
 // Engine 编排器。
@@ -49,6 +53,8 @@ type Engine struct {
 	mu       sync.Mutex
 	svcToken string
 	tokenAt  time.Time
+
+	Canvas *CanvasEngine // 画布编排（PG 就绪时非空）
 }
 
 // New 构造。
@@ -69,9 +75,9 @@ func (e *Engine) Register(r gin.IRouter) {
 
 // sseWriter 五帧输出。
 type sseWriter struct {
-	c    *gin.Context
-	mu   sync.Mutex
-	seq  int
+	c   *gin.Context
+	mu  sync.Mutex
+	seq int
 }
 
 func (s *sseWriter) send(event, data string) {
@@ -112,6 +118,13 @@ func (e *Engine) chatStream(c *gin.Context) {
 	// 身份：网关注入（门户）或服务方自报
 	userCode := c.GetHeader("X-User-Id")
 	warehouse := c.GetHeader("X-User-Warehouse")
+
+	// 画布编排：有已发布图时走画布执行（会话粘版本）
+	if e.Canvas != nil {
+		if done := e.runCanvasStream(c, s, query, userCode, warehouse, convID); done {
+			return
+		}
+	}
 
 	intent, strategy := routeIntent(query)
 	s.sendJSON("progress", gin.H{"node": "supervise", "produced": []string{"route"}})
@@ -312,7 +325,7 @@ func (e *Engine) runChart(ctx context.Context, warehouse string, s *sseWriter) (
 		totalVals = append(totalVals, r.total)
 	}
 	option := gin.H{
-		"title": gin.H{"text": "终端库存可用量分布（按型号）"},
+		"title":   gin.H{"text": "终端库存可用量分布（按型号）"},
 		"tooltip": gin.H{"trigger": "axis"},
 		"xAxis":   gin.H{"type": "category", "data": names},
 		"yAxis":   gin.H{"type": "value"},
@@ -414,4 +427,54 @@ func (e *Engine) conversationList(c *gin.Context) {
 	defer resp.Body.Close()
 	body, _ := io.ReadAll(resp.Body)
 	c.Data(http.StatusOK, "application/json", body)
+}
+
+// runCanvasStream 画布执行路径：有已发布图 → 会话粘版本执行。
+// 返回 true 表示已产出完整五帧（调用方直接 return）；
+// false = 没有已发布图（回退内置路线）。
+func (e *Engine) runCanvasStream(c *gin.Context, s *sseWriter, query, userCode, warehouse, convID string) bool {
+	raw, version, err := e.Canvas.Store.LoadPublished(c.Request.Context())
+	if err != nil || raw == nil {
+		return false
+	}
+	// 会话粘版本：已有会话沿用其绑定版本，新会话绑定当前版本
+	bound := version
+	if bound0, err := e.Canvas.Store.ConversationVersion(c.Request.Context(), convID); err == nil && bound0 > 0 {
+		raw0, v, err2 := e.Canvas.Store.LoadPublished(c.Request.Context())
+		if err2 == nil && raw0 != nil && bound0 <= v {
+			if dslBytes, err3 := e.Canvas.Store.LoadVersion(c.Request.Context(), bound0); err3 == nil {
+				raw, bound = dslBytes, bound0
+			}
+		}
+	}
+	_ = e.Canvas.Store.BindConversation(c.Request.Context(), convID, userCode, warehouse, bound)
+	dsl, err := canvas.FromJSON(raw)
+	if err != nil {
+		s.send("error", "编排异常：画布 DSL 解析失败: "+err.Error())
+		return true
+	}
+	st := &canvas.State{Query: query, UserID: userCode, Warehouse: warehouse,
+		HTTPDo: e.Canvas.Agent.SignedHTTPDo}
+	var produced []map[string]any
+	final, err := e.Canvas.RunGraph(c.Request.Context(), dsl, st, func(node string, keys []string) {
+		produced = append(produced, map[string]any{"node": node, "produced": keys})
+		s.sendJSON("progress", gin.H{"node": node, "produced": keys})
+	})
+	if err != nil {
+		s.send("error", "编排异常："+err.Error())
+		return true
+	}
+	s.sendJSON("agent_step", gin.H{"seq": 1, "text": final.Answer})
+	result := gin.H{
+		"agent_response":  final.Answer,
+		"strategy":        fmt.Sprintf("canvas_v%d", bound),
+		"route":           final.Route,
+		"conversation_id": convID,
+		"graph_version":   bound,
+	}
+	if final.Chart != nil {
+		result["cards"] = final.Chart["cards"]
+	}
+	s.sendJSON("result", result)
+	return true
 }
