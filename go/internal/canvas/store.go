@@ -122,7 +122,7 @@ func (s *Store) LoadVersion(ctx context.Context, version int) ([]byte, error) {
 // Versions 版本列表。
 func (s *Store) Versions(ctx context.Context) ([]map[string]any, error) {
 	rows, err := s.db.QueryContext(ctx, `
-		SELECT version, status, note, created_at FROM orch_graph ORDER BY version DESC`)
+		SELECT version, status, IFNULL(NULLIF(note,''),NULL) AS note, created_at::text AS created_at FROM orch_graph ORDER BY version DESC`)
 	if err != nil {
 		return nil, err
 	}

@@ -210,17 +210,19 @@ func (ce *CanvasEngine) publish(c *gin.Context) {
 		DSL  *json.RawMessage `json:"dsl"`
 		Note string           `json:"note"`
 	}
-	useBody := raw
 	publishNote := "画布发布"
-	if json.Unmarshal(raw, &req) == nil && req.DSL != nil {
-		useBody = []byte(*req.DSL)
+	useBody := raw
+	if json.Unmarshal(raw, &req) == nil {
 		publishNote = req.Note
-	}
-	if len(useBody) == 0 || string(useBody) == "null" {
-		var derr error
-		if useBody, derr = ce.Store.LoadDraft(c.Request.Context()); derr != nil || useBody == nil {
-			c.JSON(http.StatusOK, gin.H{"error": "没有可发布的草稿"})
-			return
+		if req.DSL != nil {
+			useBody = []byte(*req.DSL)
+		} else {
+			// 空 body / 仅 note：发布当前草稿
+			var derr error
+			if useBody, derr = ce.Store.LoadDraft(c.Request.Context()); derr != nil || useBody == nil {
+				c.JSON(http.StatusOK, gin.H{"error": "没有可发布的草稿"})
+				return
+			}
 		}
 	}
 	dsl, err := canvas.FromJSON(useBody)

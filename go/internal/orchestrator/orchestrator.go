@@ -68,6 +68,9 @@ func (e *Engine) Register(r gin.IRouter) {
 	r.GET("/health", func(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{"status": "ok", "service": "orchestrator"})
 	})
+	if e.Canvas != nil {
+		e.Canvas.RegisterCanvasAPI(r)
+	}
 	r.POST("/orchestrator/v1/chat/stream", e.chatStream)
 	r.GET("/orchestrator/v1/conversation/list", e.conversationList)
 	r.POST("/orchestrator/v1/replenish/preview", e.replenishPreview)
@@ -433,6 +436,9 @@ func (e *Engine) conversationList(c *gin.Context) {
 // 返回 true 表示已产出完整五帧（调用方直接 return）；
 // false = 没有已发布图（回退内置路线）。
 func (e *Engine) runCanvasStream(c *gin.Context, s *sseWriter, query, userCode, warehouse, convID string) bool {
+	if e.Canvas == nil || e.Canvas.Store == nil {
+		return false
+	}
 	raw, version, err := e.Canvas.Store.LoadPublished(c.Request.Context())
 	if err != nil || raw == nil {
 		return false

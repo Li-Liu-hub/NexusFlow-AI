@@ -12,6 +12,7 @@ import (
 	"syscall"
 	"time"
 
+	_ "github.com/jackc/pgx/v5/stdlib"
 	"github.com/gin-gonic/gin"
 
 	"github.com/aismp/platform/internal/canvas"
@@ -44,15 +45,16 @@ func run(log *slog.Logger) error {
 	// PG（terminal_kb）：orch_graph 版本库。缺 DSN 时画布编排不装配（内置路线兜底）。
 	var canvasEng *orchestrator.CanvasEngine
 	if pgDSN := getenv("PG_DSN", ""); pgDSN != "" {
-		if pg, err := sql.Open("pgx", pgDSN); err == nil {
-			if err := pg.PingContext(rootCtx); err == nil {
-				store := canvas.NewCanvasStore(pg)
-				_ = store.EnsureSchema(rootCtx)
-				eng := orchestrator.New(cfg, log)
-				eng.Canvas = &orchestrator.CanvasEngine{Store: store, Agent: eng}
-				canvasEng = eng.Canvas
-				log.Info("画布编排已装配")
-			}
+		pg, err := sql.Open("pgx", pgDSN)
+		if err != nil {
+			log.Error("画布编排 PG 连接打开失败", "err", err)
+		} else if err := pg.PingContext(rootCtx); err != nil {
+			log.Error("画布编排 PG 探活失败", "err", err)
+		} else {
+			store := canvas.NewCanvasStore(pg)
+			_ = store.EnsureSchema(rootCtx)
+			canvasEng = &orchestrator.CanvasEngine{Agent: orchestrator.New(cfg, log), Store: store}
+			log.Info("画布编排已装配")
 		}
 	}
 
@@ -60,7 +62,11 @@ func run(log *slog.Logger) error {
 	r := gin.New()
 	r.Use(gin.Recovery())
 	eng := orchestrator.New(cfg, log)
-	eng.Canvas = canvasEng
+	if canvasEng != nil {
+		eng.Canvas = canvasEng
+	} else {
+		eng.Canvas = &orchestrator.CanvasEngine{Agent: eng} // 兜底：Store 为 nil 时画布路径自动跳过
+	}
 	eng.Register(r)
 
 	srv := &http.Server{Addr: cfg.Addr, Handler: r, ReadHeaderTimeout: 5 * time.Second}
