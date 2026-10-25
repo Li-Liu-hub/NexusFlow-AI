@@ -113,7 +113,12 @@ func (e *Engine) chatStream(c *gin.Context) {
 	c.Writer.Header().Set("Content-Type", "text/event-stream")
 	c.Writer.Header().Set("Cache-Control", "no-cache")
 	s := &sseWriter{c: c}
-	convID := "orch-" + fmt.Sprintf("%d", time.Now().UnixNano()/1_000_000)
+	// 会话粘版本的前提：客户端回传的 conversationId 必须沿用（多轮对话同一会话），
+	// 只有没传时才新生成 —— 此前每次都新建，粘版本永远不生效（实测抓到）。
+	convID := c.Query("conversationId")
+	if strings.TrimSpace(convID) == "" {
+		convID = "orch-" + fmt.Sprintf("%d", time.Now().UnixNano()/1_000_000)
+	}
 	s.sendJSON("start", gin.H{"conversation_id": convID})
 
 	if query == "" {
