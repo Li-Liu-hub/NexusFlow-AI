@@ -787,7 +787,9 @@ func (l *LLM) StreamChat(ctx context.Context, model string, temperature float64,
 					acc.ID = tc.ID
 				}
 				if tc.Function.Name != "" {
-					acc.Function.Name += tc.Function.Name
+					// MiMo 等兼容端点在每个增量块里全量重发函数名：覆盖而非拼接，
+					// 拼接会得到 searchHandbooksearchHandbook...（实测踩过）
+					acc.Function.Name = tc.Function.Name
 				}
 				if tc.Function.Arguments != "" {
 					acc.Function.Arguments += tc.Function.Arguments

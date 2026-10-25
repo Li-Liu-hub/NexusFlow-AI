@@ -243,6 +243,7 @@ func (e *Engine) executeLoop(ctx context.Context, asm *Assembled, t tc,
 		GatewayBaseURL: e.Cfg.GatewayBaseURL, GatewayAK: e.Cfg.GatewayAK, GatewaySK: e.Cfg.GatewaySK,
 		AgentBaseURL: e.Cfg.AgentBaseURL, HTTPClient: e.HTTP,
 	}
+	e.Log.Info("对话开始", "agent", t.AgentCode, "工具数", len(asm.Tools), "turns", maxTurns, "model", model)
 	messages := []Message{{Role: "system", Content: asm.SystemPrompt}}
 	for _, h := range history {
 		messages = append(messages, Message{Role: h[0], Content: h[1]})
@@ -278,8 +279,10 @@ func (e *Engine) executeLoop(ctx context.Context, asm *Assembled, t tc,
 			return llmAnswer{Err: err.Error()}
 		}
 		if len(toolCalls) == 0 {
+			e.Log.Info("模型直接作答", "turn", turn, "len", full.Len())
 			break
 		}
+		e.Log.Info("模型请求工具", "turn", turn, "count", len(toolCalls), "names", func() []string { n := []string{}; for _, c := range toolCalls { n = append(n, c.Function.Name) }; return n }())
 		// 把 assistant 的工具调用请求与执行结果回填对话
 		assistantMsg := Message{Role: "assistant", Content: full.String(), ToolCalls: toolCalls}
 		if full.Len() == 0 {
@@ -290,6 +293,7 @@ func (e *Engine) executeLoop(ctx context.Context, asm *Assembled, t tc,
 			def := toolByName[call.Function.Name]
 			var result string
 			if def == nil {
+				e.Log.Warn("未挂载的工具被调用", "tool", call.Function.Name)
 				result = fmt.Sprintf(`{"error":"未挂载的工具: %s"}`, call.Function.Name)
 			} else {
 				result = Execute(ctx, toolCtx, def, call.Function.Arguments)
@@ -430,6 +434,7 @@ func (e *Engine) Register(r gin.IRouter) {
 
 	// 管理面（对齐 *AdminController）
 	a := r.Group("/admin", e.auth)
+	e.RegisterKBAdmin(a)
 	a.GET("/agent/list", e.adminAgentList)
 	a.GET("/agent/catalog/skills", e.adminSkillList)
 	a.GET("/agent/catalog/tools", e.adminToolList)

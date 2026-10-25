@@ -1,12 +1,13 @@
-// Command terminal-agent 是 aismp-agent 终端业务的 Go 实现（P2 起步：台账 + 调拨状态机）。
+// Command terminal-agent 是 aismp-agent 终端业务的 Go 实现（P2 + 知识检索栈）。
 //
 // 对应 Java 侧 server.port: 8124。监听 :8124，路径无 context-path
-// （网关已剥 /api 段）：/terminal/**、/transferOrder/**。
-// 业务数据在 api_db（MySQL）；PG（terminal_kb）只服务 KB/RAG，由对话链路使用。
+// （网关已剥 /api 段）：/terminal/**、/transferOrder/**、/oa/**、/inner/kb/**。
+// 业务数据在 api_db（MySQL）；PG（terminal_kb）承载 vector_store。
 package main
 
 import (
 	"context"
+	"database/sql"
 	"errors"
 	"log/slog"
 	"net/http"
@@ -15,9 +16,11 @@ import (
 	"syscall"
 	"time"
 
+	_ "github.com/jackc/pgx/v5/stdlib"
 	"github.com/gin-gonic/gin"
 
 	"github.com/aismp/platform/internal/httpkit"
+	"github.com/aismp/platform/internal/kb"
 	"github.com/aismp/platform/internal/terminal"
 	"github.com/aismp/platform/internal/store"
 )
@@ -49,6 +52,21 @@ func run(log *slog.Logger) error {
 	}
 	defer func() { _ = db.Close() }()
 
+	// PG（terminal_kb）：vector_store。缺 DSN 时知识检索栈不装配（终端业务不受影响）。
+	var pg *sql.DB
+	if pgDSN := getenv("PG_DSN", ""); pgDSN != "" {
+		if pg, err = sql.Open("pgx", pgDSN); err != nil {
+			return err
+		}
+		pingCtx, cancel := context.WithTimeout(rootCtx, 5*time.Second)
+		if err := pg.PingContext(pingCtx); err != nil {
+			cancel()
+			return err
+		}
+		cancel()
+		defer pg.Close()
+	}
+
 	gin.SetMode(gin.ReleaseMode)
 	r := gin.New()
 	r.Use(gin.Recovery())
@@ -60,6 +78,36 @@ func run(log *slog.Logger) error {
 	})
 
 	terminal.NewHandler(terminal.NewRepository(db), log).Register(r)
+
+	// 知识检索栈（PG + SiliconFlow + MiMo 齐备才装配）
+	if pg != nil && getenv("SILICONFLOW_API_KEY", "") != "" && getenv("MIMO_API_KEY", "") != "" {
+		svc := &kb.Service{
+			Cfg: kb.Config{
+				Enabled:       getenv("KB_HYBRID_ENABLED", "true") == "true",
+				MultiQuery:    atoiDefault(getenv("KB_MULTI_QUERY", "3"), 3),
+				RRFK:          60,
+				Candidates:    20,
+				TopK:          5,
+				VectorWeight:  1.0,
+				KeywordWeight: 1.0,
+				RerankEnabled: getenv("KB_RERANK_ENABLED", "true") == "true",
+				RerankModel:   getenv("KB_RERANK_MODEL", "BAAI/bge-reranker-v2-m3"),
+				SimThreshold:  0.5,
+				EmbedModel:    getenv("EMBED_MODEL", "BAAI/bge-m3"),
+				ChatModel:     getenv("LLM_MODEL", "mimo-v2.6-flash"),
+			},
+			PG:  kb.NewPgStore(pg),
+			SF:  &kb.SiliconFlow{BaseURL: getenv("EMBED_BASE_URL", "https://api.siliconflow.cn"),
+				APIKey: getenv("SILICONFLOW_API_KEY", ""), Client: &http.Client{Timeout: 30 * time.Second}},
+			LLM: &kb.ChatClient{BaseURL: getenv("LLM_BASE_URL", "https://api.xiaomimimo.com"),
+				APIKey: getenv("MIMO_API_KEY", ""), Model: getenv("LLM_MODEL", "mimo-v2.6-flash")},
+			Log: log,
+		}
+		terminal.NewKBHandler(svc).RegisterKB(r)
+		log.Info("知识检索栈已装配", "hybrid", svc.Cfg.Enabled, "rerank", svc.Cfg.RerankEnabled)
+	} else {
+		log.Warn("知识检索栈未装配（缺 PG_DSN / SILICONFLOW_API_KEY / MIMO_API_KEY）")
+	}
 
 	srv := &http.Server{
 		Addr:              cfg.Addr,
@@ -86,4 +134,25 @@ func run(log *slog.Logger) error {
 	}
 	log.Info("已关闭")
 	return nil
+}
+
+func getenv(key, def string) string {
+	if v := os.Getenv(key); v != "" {
+		return v
+	}
+	return def
+}
+
+func atoiDefault(s string, def int) int {
+	n := 0
+	for _, r := range s {
+		if r < '0' || r > '9' {
+			return def
+		}
+		n = n*10 + int(r-'0')
+	}
+	if n <= 0 {
+		return def
+	}
+	return n
 }

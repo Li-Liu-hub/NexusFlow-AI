@@ -11,9 +11,12 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"regexp"
 	"strings"
 	"time"
+
+	"log/slog"
 )
 
 // ToolContext 一次对话的工具执行上下文（审计落点）。
@@ -39,6 +42,8 @@ type ToolContext struct {
 func Execute(ctx context.Context, tc *ToolContext, def *ToolDef, argsJSON string) string {
 	start := time.Now()
 	result, count, err := executeRaw(ctx, tc, def, argsJSON)
+	slog.Info("工具执行", "tool", def.ToolName, "type", ns2(def.ToolType),
+		"resultLen", len(result), "count", count, "err", err)
 	elapsed := time.Since(start).Milliseconds()
 	status, errMsg := "success", ""
 	if err != nil {
@@ -62,7 +67,7 @@ func executeRaw(ctx context.Context, tc *ToolContext, def *ToolDef, argsJSON str
 		return execSQLTool(ctx, tc, def, argsJSON)
 	case "API_CALL":
 		return execAPICallTool(ctx, tc, def, argsJSON)
-	case "KNOWLEDGE_RETRIEVAL":
+	case "KB_RETRIEVAL", "KNOWLEDGE_RETRIEVAL":
 		return execKBTool(ctx, tc, def, argsJSON)
 	case "MCP":
 		return execMCPTool(ctx, tc, def, argsJSON)
@@ -187,60 +192,80 @@ func normalize(v any) any {
 	}
 }
 
-// ---- API_CALL（经网关签名转发）----
+// ---- API_CALL（经网关签名转发；config_json 对齐 a_llm_tool 真实形态：
+// {"serviceName","endpoint","method","params":{"k":"${var}"}}，模板变量从模型入参替换）----
 
 func execAPICallTool(ctx context.Context, tc *ToolContext, def *ToolDef, argsJSON string) (string, int, error) {
-	// config_json: {"path": "...", "method": "POST"}；入参作为查询串或 body
 	var cfg struct {
-		Path   string `json:"path"`
-		Method string `json:"method"`
+		ServiceName string            `json:"serviceName"`
+		Endpoint    string            `json:"endpoint"`
+		Method      string            `json:"method"`
+		Params      map[string]string `json:"params"`
 	}
 	if def.ConfigJSON != nil && *def.ConfigJSON != "" {
 		if err := json.Unmarshal([]byte(*def.ConfigJSON), &cfg); err != nil {
 			return "", 0, fmt.Errorf("config_json 解析失败: %w", err)
 		}
 	}
-	if cfg.Path == "" {
-		return "", 0, errors.New("API_CALL 工具缺少 config_json.path")
+	if cfg.Endpoint == "" {
+		return "", 0, errors.New("API_CALL 工具缺少 config_json.endpoint")
 	}
 	method := strings.ToUpper(cfg.Method)
 	if method == "" {
 		method = http.MethodGet
 	}
-	target := strings.TrimSuffix(tc.GatewayBaseURL, "/") + cfg.Path
-	var bodyReader io.Reader
+	var input map[string]any
+	if argsJSON != "" {
+		_ = json.Unmarshal([]byte(argsJSON), &input)
+	}
+	substitute := func(tpl string) string {
+		for k, v := range input {
+			tpl = strings.ReplaceAll(tpl, "${"+k+"}", fmt.Sprintf("%v", v))
+		}
+		for {
+			i := strings.Index(tpl, "${")
+			if i < 0 {
+				break
+			}
+			j := strings.Index(tpl[i:], "}")
+			if j < 0 {
+				break
+			}
+			tpl = tpl[:i] + tpl[i+j+1:]
+		}
+		return tpl
+	}
+	target := strings.TrimSuffix(tc.GatewayBaseURL, "/") + cfg.Endpoint
+	var req *http.Request
+	var err error
 	if method == http.MethodGet {
-		if argsJSON != "" && argsJSON != "{}" {
-			var params map[string]any
-			if err := json.Unmarshal([]byte(argsJSON), &params); err == nil {
-				qs := "?"
-				for k, v := range params {
-					qs += k + "=" + fmt.Sprintf("%v", v) + "&"
-				}
-				target += strings.TrimSuffix(qs, "&")
+		qs := url.Values{}
+		for k, tpl := range cfg.Params {
+			if v := substitute(tpl); v != "" {
+				qs.Set(k, v)
 			}
 		}
+		if len(qs) > 0 {
+			target += "?" + qs.Encode()
+		}
+		req, err = http.NewRequestWithContext(ctx, method, target, nil)
 	} else {
-		bodyReader = strings.NewReader(argsJSON)
+		body := orEmptyObj(argsJSON)
+		req, err = http.NewRequestWithContext(ctx, method, target, strings.NewReader(body))
 	}
-	req, err := http.NewRequestWithContext(ctx, method, target, bodyReader)
 	if err != nil {
 		return "", 0, err
 	}
 	req.Header.Set("Content-Type", "application/json")
-	// 网关签名（对齐 OpenApiClient）：accessKey/nonce/timestamp/body/sign
 	payload := argsJSON
 	if payload == "" {
 		payload = "null"
 	}
-	nonce := newUUID()
-	nonce = strings.ReplaceAll(nonce, "-", "")
 	req.Header.Set("accessKey", tc.GatewayAK)
-	req.Header.Set("nonce", nonce)
+	req.Header.Set("nonce", strings.ReplaceAll(newUUID(), "-", ""))
 	req.Header.Set("timestamp", fmt.Sprintf("%d", time.Now().Unix()))
 	req.Header.Set("body", payload)
-	sum := sha256.Sum256([]byte(payload + "." + tc.GatewaySK))
-	req.Header.Set("sign", hex.EncodeToString(sum[:]))
+	req.Header.Set("sign", gatewaySign(payload, tc.GatewaySK))
 
 	resp, err := tc.HTTPClient.Do(req)
 	if err != nil {
@@ -254,13 +279,14 @@ func execAPICallTool(ctx context.Context, tc *ToolContext, def *ToolDef, argsJSO
 	return string(body), 1, nil
 }
 
-// ---- KNOWLEDGE_RETRIEVAL（HTTP 调 agent 的 /inner/kb/search）----
+// ---- KNOWLEDGE_RETRIEVAL（对齐 KnowledgeRetrievalToolCallback：
+// config_json.endpoint 缺省 /oa/chat/sync，经网关 AK/SK 签名调用 agent 的 RAG 问答，
+// 返回 {answer}——答案是检索增强后的成文，不是原始分片）----
 
 func execKBTool(ctx context.Context, tc *ToolContext, def *ToolDef, argsJSON string) (string, int, error) {
 	var in struct {
 		Question string `json:"question"`
 		Query    string `json:"query"`
-		TopK     int    `json:"topK"`
 	}
 	if argsJSON != "" {
 		_ = json.Unmarshal([]byte(argsJSON), &in)
@@ -272,28 +298,63 @@ func execKBTool(ctx context.Context, tc *ToolContext, def *ToolDef, argsJSON str
 	if q == "" {
 		return "", 0, errors.New("缺少 question 参数")
 	}
-	payload, _ := json.Marshal(map[string]any{"query": q, "topK": in.TopK})
-	req, _ := http.NewRequestWithContext(ctx, http.MethodPost,
-		strings.TrimSuffix(tc.AgentBaseURL, "/")+"/inner/kb/search",
-		strings.NewReader(string(payload)))
+	endpoint := "/oa/chat/sync"
+	if def.ConfigJSON != nil && *def.ConfigJSON != "" {
+		var cfg struct {
+			Endpoint string `json:"endpoint"`
+		}
+		if json.Unmarshal([]byte(*def.ConfigJSON), &cfg) == nil && cfg.Endpoint != "" {
+			endpoint = cfg.Endpoint
+		}
+	}
+	payload := map[string]any{
+		"message":        q,
+		"conversationId": newUUID(), // 独立子调用，不污染会话记忆（Java 同款）
+	}
+	rawBody, _ := json.Marshal(payload)
+	asciiBody := toASCIIJSONBytes(rawBody)
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost,
+		strings.TrimSuffix(tc.GatewayBaseURL, "/")+endpoint, strings.NewReader(asciiBody))
+	if err != nil {
+		return "", 0, err
+	}
 	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("accessKey", tc.GatewayAK)
+	req.Header.Set("nonce", strings.ReplaceAll(newUUID(), "-", ""))
+	req.Header.Set("timestamp", fmt.Sprintf("%d", time.Now().Unix()))
+	req.Header.Set("sign", gatewaySign(asciiBody, tc.GatewaySK))
+	req.Header.Set("body", asciiBody)
 	resp, err := tc.HTTPClient.Do(req)
 	if err != nil {
 		return "", 0, err
 	}
 	defer resp.Body.Close()
-	body, err := io.ReadAll(io.LimitReader(resp.Body, 1<<20))
-	if err != nil {
-		return "", 0, err
+	body, _ := io.ReadAll(io.LimitReader(resp.Body, 1<<20))
+	if resp.StatusCode != http.StatusOK {
+		// 不把错误页塞给模型：只回状态码，让它如实转述
+		return fmt.Sprintf("{\"error\":\"知识手册检索服务暂时不可用（status=%d）\"}", resp.StatusCode), 0, nil
 	}
-	var parsed struct {
-		Hits []map[string]any `json:"hits"`
+	return fmt.Sprintf("{\"answer\":%s}", jsonString(string(body))), 1, nil
+}
+
+// gatewaySign 网关签名：SHA256(body + "." + sk) 小写 hex。
+func gatewaySign(body, sk string) string {
+	sum := sha256.Sum256([]byte(body + "." + sk))
+	return hex.EncodeToString(sum[:])
+}
+
+// toASCIIJSONBytes JSON 内非 ASCII 转 \uXXXX（body 头只允许 ASCII，转义是合法 JSON 不破坏结构）。
+func toASCIIJSONBytes(b []byte) string {
+	var sb strings.Builder
+	for _, r := range string(b) {
+		if r < 0x80 {
+			sb.WriteByte(byte(r))
+		} else {
+			fmt.Fprintf(&sb, "\\u%04x", r)
+		}
 	}
-	count := 0
-	if json.Unmarshal(body, &parsed) == nil {
-		count = len(parsed.Hits)
-	}
-	return string(body), count, nil
+	return sb.String()
 }
 
 // ---- MCP（远端 MCP server 的 tools/call，streamable HTTP 简化版）----
@@ -341,7 +402,7 @@ func orEmptyObj(s string) string {
 func ToolDefsToOpenAI(defs []*ToolDef) []ToolDefJSON {
 	var out []ToolDefJSON
 	for _, def := range defs {
-		if ns2(def.Status) != "" && ns2(def.Status) != "active" {
+		if ns2(def.Status) != "" && !strings.EqualFold(ns2(def.Status), "active") {
 			continue
 		}
 		var params map[string]any
