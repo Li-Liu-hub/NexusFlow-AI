@@ -153,7 +153,8 @@ func (g *Gateway) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	isAuthPath := strings.HasPrefix(path, "/api/auth")
 	isLogout := strings.HasPrefix(path, "/api/auth/logout")
 	isMcp := strings.HasPrefix(path, "/sse") || strings.HasPrefix(path, "/mcp")
-	isDualBiz := strings.HasPrefix(path, "/api/terminal") || strings.HasPrefix(path, "/api/transferOrder")
+	isDualBiz := strings.HasPrefix(path, "/api/terminal") || strings.HasPrefix(path, "/api/transferOrder") ||
+		strings.HasPrefix(path, "/api/contract") || strings.HasPrefix(path, "/api/ticket")
 	isPortal := isAuthPath ||
 		strings.HasPrefix(path, "/api/agent") || strings.HasPrefix(path, "/api/admin") ||
 		strings.HasPrefix(path, "/api/orchestrator") || isDualBiz ||
