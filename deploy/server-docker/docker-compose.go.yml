@@ -71,6 +71,7 @@ services:
       AGENT_URL: "http://agent:8124"
       KERNEL_URL: "http://kernel:8126"
       ORCHESTRATOR_URL: "http://orchestrator:8125"
+      BIZ_URL: "http://bizsuite:8130"
       MOCK_URL: "http://127.0.0.1:8123"
       PORTAL_ACCESS_KEY: "aismp-console"
       COUNT_URL: "http://backend:7529/api/inner/userInterfaceInfo/invokeCount"
@@ -167,6 +168,28 @@ services:
     mem_limit: 64m
     depends_on:
       - kernel
+    networks: [apnet]
+
+  bizsuite:
+    <<: *go-defaults
+    image: nginx:1.27-alpine
+    container_name: ap-bizsuite
+    entrypoint: ["/app/bizsuite"]
+    environment:
+      HTTP_ADDR: ":8130"
+      MYSQL_DSN: "${MYSQL_APP_USER}:${MYSQL_APP_PW}@tcp(mysql:3306)/api_db?parseTime=true&loc=Local&charset=utf8mb4&timeout=5s"
+      GROUP_LLM_BASE_URL: ${LLM_BASE_URL:-https://api.xiaomimimo.com}
+      GROUP_LLM_API_KEY: ${MIMO_API_KEY:-}
+      GROUP_LLM_MODEL: ${LLM_MODEL:-mimo-v2.6-flash}
+      QWEN_BASE_URL: ${LLM_BASE_URL:-https://api.xiaomimimo.com}
+      QWEN_API_KEY: ${MIMO_API_KEY:-}
+      QWEN_MODEL: ${KB_QWEN_MODEL:-qwen3-6.5b-a3b}
+      ARCHIVE_DIR: /tmp/biz-archive
+    volumes:
+      - /opt/agent-platform/go-bin:/app:ro
+    mem_limit: 96m
+    depends_on:
+      mysql: { condition: service_healthy }
     networks: [apnet]
 
   nginx:

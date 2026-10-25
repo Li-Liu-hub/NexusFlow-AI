@@ -1,0 +1,28 @@
+{
+  "openapi": "3.0.3",
+  "info": {"title": "bizsuite（业务套件）", "version": "1.0.0",
+    "description": "合同信智能抽取（9 态状态机，100 条/批，双路 LLM 抽取 21 项合同信息）+ AI 辅助工单建单（7 类分类，requestId 防重复提交，远端成功本地失败只补写）。"},
+  "servers": [{"url": "/api"}],
+  "paths": {
+    "/contract/notify": {"post": {"summary": "上传通知（9 态起点：UPLOADED）", "security": [{"bearerAuth": []}], "requestBody": {"content": {"application/json": {"schema": {"type": "object", "required": ["fileNo", "fileName"], "properties": {"fileNo": {"type": "string", "example": "HT-2026-001"}, "fileName": {"type": "string"}, "batchNo": {"type": "string", "description": "批次号，缺省按日期"}, "content": {"type": "string", "description": "合同正文（纯文本）"}, "auditHtml": {"type": "string", "description": "审签单 HTML（第二路抽取源）"}}}}}}, "responses": {"200": {"description": "{accepted,fileNo,state:UPLOADED}"}}}},
+    "/contract/process": {"post": {"summary": "推进状态机一批（每文件前进一步，≤100 条/批，单条失败不影响整批）", "security": [{"bearerAuth": []}], "responses": {"200": {"description": "{counts:{状态→数量}} —— 24h 超时标记/采集重试≤30/抽取/回写计数"}}}},
+    "/contract/list": {"get": {"summary": "文件列表（可按状态过滤）", "security": [{"bearerAuth": []}], "parameters": [{"name": "state", "in": "query", "schema": {"type": "string", "enum": ["UPLOADED", "COLLECTING", "COLLECTED", "ARCHIVED", "EXTRACTING", "EXTRACTED", "WRITING", "DONE", "FAILED"]}}, {"name": "limit", "in": "query", "schema": {"type": "integer", "default": 100}}], "responses": {"200": {"description": "{files:[...]}"}}}},
+    "/contract/detail": {"get": {"summary": "单文件明细（状态 + 21 项字段抽取结果）", "security": [{"bearerAuth": []}], "parameters": [{"name": "fileNo", "in": "query", "required": true, "schema": {"type": "string"}}], "responses": {"200": {"description": "{file:{state,retryCount,timeoutFlag,s3Key,...}, mergedFields:{21项}, fieldOrder:[...]"}}}},
+    "/contract/retry": {"post": {"summary": "手动重试（FAILED → COLLECTING）", "security": [{"bearerAuth": []}], "parameters": [{"name": "fileNo", "in": "query", "required": true, "schema": {"type": "string"}}], "responses": {"200": {"description": "{retried:bool}"}}}},
+    "/ticket/categories": {"get": {"summary": "7 类工单分类清单", "security": [{"bearerAuth": []}], "responses": {"200": {"description": "use_apply/return_apply/fault_repair/transfer_apply/stocktake/info_change/other_consult"}}}},
+    "/ticket/assist": {"post": {"summary": "AI 辅助分类 + 建单参数生成（不落库不建单）", "security": [{"bearerAuth": []}], "requestBody": {"content": {"application/json": {"schema": {"type": "object", "required": ["text"], "properties": {"text": {"type": "string", "description": "客户描述（APP 语音转写文本同走此字段）"}, "source": {"type": "string", "enum": ["pc", "app"]}}}}}}, "responses": {"200": {"description": "{category,params:{title,urgency,detail},source}"}}}},
+    "/ticket/create": {"post": {"summary": "建单（requestId 防重复提交；远端成功本地失败只补写不重建）", "security": [{"bearerAuth": []}], "requestBody": {"content": {"application/json": {"schema": {"type": "object", "required": ["requestId", "text"], "properties": {"requestId": {"type": "string", "description": "防重复提交标识（唯一约束）"}, "text": {"type": "string"}, "source": {"type": "string", "enum": ["pc", "app"]}, "category": {"type": "string", "description": "可省略——省略时自动分类"}, "params": {"type": "object"}}}}}}, "responses": {"200": {"description": "{duplicate,state:saved|created|failed,platformTicketId?,error?} —— duplicate=true 表示命中防重，返回首次结果"}}}},
+    "/ticket/history": {"get": {"summary": "历史查询（PC/APP 双端共用）", "security": [{"bearerAuth": []}], "parameters": [{"name": "userId", "in": "query", "schema": {"type": "string"}}, {"name": "limit", "in": "query", "schema": {"type": "integer", "default": 20}}], "responses": {"200": {"description": "{history:[{requestId,category,state,platformTicketId,...}]}"}}}}
+  },
+  "components": {
+    "securitySchemes": {"bearerAuth": {"type": "http", "scheme": "bearer"}},
+    "x-state-machine": {
+      "states": "UPLOADED→COLLECTING→COLLECTED→ARCHIVED→EXTRACTING→EXTRACTED→WRITING→DONE（含 FAILED）",
+      "batchSize": 100,
+      "uploadTimeout": "24h（标记不阻断）",
+      "collectRetry": "≤30 次耗尽转 FAILED",
+      "isolation": "单条失败不影响整批",
+      "extraction": "双路：正文→集团智能体端点；HTML审签单→Qwen 端点（剥标签）；JSON Schema 校验 21 项；非空合并（正文优先）"
+    }
+  }
+}

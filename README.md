@@ -56,7 +56,9 @@ flowchart TB
     TA["terminal-agent :8124（Go）<br/>台账聚合 · 调拨状态机 · 库存告警 · RAG混合检索"]
     KH["kernel :8126（Go）<br/>数字员工内核：配置装配（按version热重建）+ ReactAgent 工具循环"]
     OR["orchestrator :8125（Go）<br/>画布编排：DSL校验/版本固化/会话粘版本/回滚 + 五帧SSE"]
+    BZ["bizsuite :8130（Go）<br/>合同信抽取（9态/100批/双路LLM/21项）+ AI工单建单（7类/防重/补写）"]
 
+    BZ --> MY
     MY[("MySQL<br/>api_db：平台+终端库存+auth<br/>terminal_db：数字员工配置+会话+审计")]
     PG[("PostgreSQL terminal_kb<br/>pgvector 1024 维 RAG + orch_graph 画布版本")]
     RD[("Redis<br/>门户令牌 / nonce 防重放 / AK-SK 缓存")]
@@ -68,6 +70,7 @@ flowchart TB
     G -->|"/api/terminal/** /api/transferOrder/** /oa/**"| TA
     G -->|"/api/agent/** /api/admin/** /digitalHuman/**"| KH
     G -->|"/api/orchestrator/**"| OR
+    G -->|"/api/contract/** /api/ticket/**"| BZ
     OR -->|"画布节点：KB问答走内核<br/>fetch 走 agent（经网关签名）"| G
     KH -->|"知识检索工具 → /oa/chat/sync（网关签名）"| G
     TA --> MY
@@ -88,6 +91,7 @@ interface_info 登记都在网关上）；**内核知识检索回调 agent**（�
 | `terminal-agent` | 8124 | ~4.0 MiB | 台账聚合、调拨状态机、告警扫描、RAG 混合检索与向量库 |
 | `kernel` | 8126 | ~9 MiB | 数字员工装配（version 热重建）、ReactAgent 工具循环、管理面、审计 |
 | `orchestrator` | 8125 | ~2.8 MiB | 画布 DSL 解释器、版本固化/回滚、五帧 SSE |
+| `bizsuite` | 8130 | ~4 MiB | 合同信 9 态抽取、AI 工单建单（防重/补写） |
 
 > Java 版对照：仅 backend 一个 JVM 容器实测 244 MiB；Go 全栈五个服务合计 ~23 MiB。
 
@@ -120,6 +124,16 @@ JSON DSL（entry/nodes/edges/conditional）→ 校验五规则（结构完整、
 会话继续用原版本，新会话用最新）→ 回滚 = 旧版本再发布。执行：最大步数 20（对齐
 recursionLimit），单节点访问超限判业务流程回路。API：draft/publish/versions/rollback/debug
 （草稿调试不发布直接执行）。
+
+---
+
+### 4. 合同信抽取与 AI 工单建单（bizsuite）
+
+合同信：上传通知起 9 态状态机（UPLOADED→…→DONE），100 条/批推进；
+双路 LLM 抽取（正文→集团端点、审签单 HTML→Qwen 端点）→ JSON Schema 校验
+（21 项合同信息：未知字段拒绝/类型/必填）→ 非空合并（正文优先）回写。
+工单：LLM 7 类分类 + 参数生成；requestId 唯一约束防重复提交（重复返回首次
+结果）；远端建单成功本地失败只补写不重建；PC/APP 双端、语音转写文本同入口。
 
 ---
 
