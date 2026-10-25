@@ -8,6 +8,7 @@ package kernel
 
 import (
 	"context"
+	"reflect"
 	"crypto/sha256"
 	"database/sql"
 	"encoding/hex"
@@ -37,7 +38,7 @@ const kbMaxFileBytes = 10 << 20
 
 // RegisterKBAdmin 挂载 /admin/kb/**（挂在已有的 e.auth 组内）。
 func (e *Engine) RegisterKBAdmin(r gin.IRouter) {
-	g := r.Group("/admin/kb", e.auth)
+	g := r.Group("/kb")  // 已挂在 /admin 组内，勿重复前缀
 	g.GET("/list", e.kbList)
 	g.GET("/settings", e.kbSettings)
 	g.POST("", e.kbCreate)
@@ -55,7 +56,8 @@ func kbJSON(c *gin.Context, data any, err error) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "系统内部异常"})
 		return
 	}
-	if data == nil {
+	// nil slice 装进 any 后 != nil（Go 接口陷阱），反射判空保证输出 [] 而非 null
+	if data == nil || reflect.ValueOf(data).Kind() == reflect.Slice && reflect.ValueOf(data).IsNil() {
 		data = []any{}
 	}
 	c.JSON(http.StatusOK, data)
@@ -71,6 +73,15 @@ func (e *Engine) kbExistsByUUID(ctx context.Context, kbUUID string) (int64, bool
 		return 0, false, nil
 	}
 	return id, err == nil, err
+}
+
+
+// kbUUIDOf 数字 id → 账本 UUID（列存的是 knowledge_base_id 字符串，URL 传数字 id）。
+func (e *Engine) kbUUIDOf(ctx context.Context, id string) (string, bool) {
+	var uuid string
+	err := e.Terminal.db.QueryRowContext(ctx,
+		`SELECT knowledge_base_id FROM a_knowledge_base WHERE id = ? AND status <> 'deleted'`, id).Scan(&uuid)
+	return uuid, err == nil
 }
 
 func (e *Engine) kbList(c *gin.Context) {
@@ -199,12 +210,17 @@ func (e *Engine) kbDelete(c *gin.Context) {
 }
 
 func (e *Engine) kbDocsList(c *gin.Context) {
+	kbUUID, ok := e.kbUUIDOf(c.Request.Context(), c.Param("id"))
+	if !ok {
+		kbJSON(c, []any{}, nil)
+		return
+	}
 	rows, err := dbMaps(c.Request.Context(), e.Terminal.db, `
 		SELECT id, document_id, knowledge_base_id, ent_code, source_name, content_type,
 		       size_bytes, checksum_sha256, embedding_model, version, status, chunk_count,
 		       IFNULL(error_message,'') AS error_message, IFNULL(category,'') AS category, created_at
 		  FROM a_knowledge_document
-		 WHERE knowledge_base_id = ? AND status <> 'deleted' ORDER BY id DESC`, c.Param("id"))
+		 WHERE knowledge_base_id = ? AND status <> 'deleted' ORDER BY id DESC`, kbUUID)
 	kbJSON(c, rows, err)
 }
 
@@ -309,11 +325,8 @@ func (e *Engine) kbUpload(c *gin.Context) {
 // kbDocDelete 删除文档：清向量 + 账本软删。
 func (e *Engine) kbDocDelete(c *gin.Context) {
 	ctx := c.Request.Context()
-	kbID := c.Param("id")
+	kbUUID, _ := e.kbUUIDOf(ctx, c.Param("id"))
 	documentID := c.Param("documentId")
-	var kbUUID string
-	e.Terminal.db.QueryRowContext(ctx,
-		`SELECT knowledge_base_id FROM a_knowledge_base WHERE id = ? AND status <> 'deleted'`, kbID).Scan(&kbUUID)
 	if _, err := e.callAgentKBDelete(ctx, documentID); err != nil {
 		c.JSON(http.StatusOK, gin.H{"error": "向量清理失败: " + err.Error()})
 		return
@@ -333,12 +346,11 @@ func (e *Engine) kbDocDelete(c *gin.Context) {
 // kbReindex 重建索引：按账本逐文档取原文重嵌入（幂等：ingest 先清旧分片）。
 func (e *Engine) kbReindex(c *gin.Context) {
 	ctx := c.Request.Context()
-	kbID := c.Param("id")
-	var kbUUID string
+	kbUUID, _ := e.kbUUIDOf(ctx, c.Param("id"))
 	var chunkSize int
 	if err := e.Terminal.db.QueryRowContext(ctx,
-		`SELECT knowledge_base_id, IFNULL(chunk_size,800) FROM a_knowledge_base WHERE id = ? AND status <> 'deleted'`,
-		kbID).Scan(&kbUUID, &chunkSize); err != nil {
+		`SELECT IFNULL(chunk_size,800) FROM a_knowledge_base WHERE knowledge_base_id = ? AND status <> 'deleted'`,
+		kbUUID).Scan(&chunkSize); err != nil {
 		c.JSON(http.StatusOK, gin.H{"error": "知识库不存在"})
 		return
 	}
