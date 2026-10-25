@@ -1,0 +1,29 @@
+{
+  "openapi": "3.0.3",
+  "info": {"title": "kernel（数字员工内核）", "version": "1.0.0",
+    "description": "数字员工运行面（ReactAgent 工具循环：SQL_TEMPLATE/KB_RETRIEVAL/API_CALL/MCP 四类工具，统一审计）与管理面（Agent/技能/工具/知识库 CRUD）。鉴权：Bearer（/auth/login 换取，api_db a_auth_token 24h）。"},
+  "servers": [{"url": "/"}],
+  "paths": {
+    "/auth/login": {"post": {"summary": "内核登录（svc 账号 + 真人）", "requestBody": {"content": {"application/json": {"schema": {"type": "object", "required": ["userCode", "password"], "properties": {"userCode": {"type": "string"}, "password": {"type": "string"}}}}}}, "responses": {"200": {"description": "{token,userCode,role,expiresInHours:24}"}, "401": {"description": "账号或密码错误"}, "403": {"description": "账号已停用"}}}},
+    "/agent/{agentCode}/chat": {"post": {"summary": "同步对话（ReactAgent 工具循环，编排层用）", "security": [{"bearerAuth": []}], "parameters": [{"name": "agentCode", "in": "path", "required": true, "schema": {"type": "string", "example": "terminal_manager"}}], "requestBody": {"content": {"application/json": {"schema": {"type": "object", "required": ["message"], "properties": {"message": {"type": "string"}, "conversationId": {"type": "string"}, "userId": {"type": "string", "description": "SERVICE 账号可代传；真人以登录身份为准"}, "dataScope": {"type": "array", "items": {"type": "string"}, "description": "数据可见仓位集合（SERVICE 代传）"}}}}}}, "responses": {"200": {"description": "{agentCode,version,traceId,conversationId,answer,elapsedMs,tokenUsage} 或 {error,quotaDenied?}"}}}},
+    "/agent/{agentCode}/chat/stream": {"get": {"summary": "SSE 流式对话（meta→delta×N→tool→done）", "security": [{"bearerAuth": []}], "parameters": [{"name": "agentCode", "in": "path", "required": true, "schema": {"type": "string"}}, {"name": "message", "in": "query", "required": true, "schema": {"type": "string"}}, {"name": "conversationId", "in": "query", "schema": {"type": "string"}}], "responses": {"200": {"description": "text/event-stream"}}}},
+    "/agent/{agentCode}/introspect": {"get": {"summary": "运行时自省（版本/技能/工具/系统提示词）", "security": [{"bearerAuth": []}], "responses": {"200": {"description": "装配快照"}}}},
+    "/agent/agents-for-role": {"get": {"summary": "角色圈定的数字员工列表", "parameters": [{"name": "role", "in": "query", "schema": {"type": "string"}}], "responses": {"200": {"description": "员工卡片"}}}},
+    "/agent/conversation/list": {"get": {"summary": "会话列表（按数字员工隔离）", "security": [{"bearerAuth": []}], "parameters": [{"name": "agentCode", "in": "query", "required": true, "schema": {"type": "string"}}, {"name": "userId", "in": "query", "schema": {"type": "string"}}, {"name": "limit", "in": "query", "schema": {"type": "integer", "default": 20}}], "responses": {"200": {"description": "会话数组"}}}},
+    "/agent/conversation/{conversationId}": {"get": {"summary": "会话消息明细", "security": [{"bearerAuth": []}], "responses": {"200": {"description": "会话+消息"}}}},
+    "/agent/conversation/{conversationId}/archive": {"post": {"summary": "归档会话", "security": [{"bearerAuth": []}], "responses": {"200": {"description": "{archived}"}}}},
+    "/admin/agent/list": {"get": {"summary": "数字员工清单", "security": [{"bearerAuth": []}], "responses": {"200": {"description": "a_agent 全量"}}}},
+    "/admin/agent/{code}/reload": {"post": {"summary": "手动逐出装配缓存", "security": [{"bearerAuth": []}], "responses": {"200": {"description": "{reloaded}——或改配置即自动按 version 重建"}}}},
+    "/admin/agent/catalog/skills": {"get": {"summary": "技能包目录", "security": [{"bearerAuth": []}], "responses": {"200": {"description": "a_agent_skill"}}}},
+    "/admin/agent/catalog/tools": {"get": {"summary": "工具目录", "security": [{"bearerAuth": []}], "responses": {"200": {"description": "a_llm_tool"}}}},
+    "/admin/agent/catalog/roles": {"get": {"summary": "角色目录", "security": [{"bearerAuth": []}], "responses": {"200": {"description": "a_role_def"}}}},
+    "/admin/agent/catalog/kbs": {"get": {"summary": "知识库目录", "security": [{"bearerAuth": []}], "responses": {"200": {"description": "a_knowledge_base"}}}},
+    "/admin/kb/settings": {"get": {"summary": "KB 约束（分类白名单/大小上限/切分参数）", "security": [{"bearerAuth": []}], "responses": {"200": {"description": "settings"}}}},
+    "/admin/kb/{id}/documents": {"get": {"summary": "文档清单（账本）", "security": [{"bearerAuth": []}], "responses": {"200": {"description": "a_knowledge_document"}}, "post": {"summary": "上传文档（multipart，txt/md/csv/json ≤10MB；正文经 agent 切分入库）", "security": [{"bearerAuth": []}], "responses": {"200": {"description": "{documentId,chunkCount,status} 或 {error}"}}}}},
+    "/admin/kb/{id}/documents/{documentId}": {"delete": {"summary": "删除文档（清向量+账本软删）", "security": [{"bearerAuth": []}], "responses": {"200": {"description": "{deleted}"}}}},
+    "/admin/kb/{id}/reindex": {"post": {"summary": "重建索引（按原文重嵌入，幂等）", "security": [{"bearerAuth": []}], "responses": {"200": {"description": "{reindexed,failed}"}}}},
+    "/admin/audit/recent": {"get": {"summary": "工具调用审计（最近 N 条）", "security": [{"bearerAuth": []}], "responses": {"200": {"description": "a_tool_call_log"}}}},
+    "/admin/audit/stats": {"get": {"summary": "工具调用统计（按工具聚合）", "security": [{"bearerAuth": []}], "responses": {"200": {"description": "calls/success/avgMs"}}}}
+  },
+  "components": {"securitySchemes": {"bearerAuth": {"type": "http", "scheme": "bearer"}}}
+}

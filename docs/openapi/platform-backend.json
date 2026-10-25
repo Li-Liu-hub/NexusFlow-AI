@@ -1,0 +1,41 @@
+{
+  "openapi": "3.0.3",
+  "info": {"title": "platform-backend（平台后端）", "version": "1.0.0",
+    "description": "门户鉴权、Token 用量分配、网关内部数据、yuapi 管理三件套、管理端代理。BaseResponse 形如 {code,data,message}；业务错误 HTTP 200 + code 非 0。"},
+  "servers": [{"url": "/api"}],
+  "paths": {
+    "/auth/login": {"post": {"summary": "门户登录（真实状态码语义）", "requestBody": {"content": {"application/json": {"schema": {"type": "object", "required": ["userCode", "password"], "properties": {"userCode": {"type": "string", "example": "xn_zg"}, "password": {"type": "string"}}}}}}, "responses": {"200": {"description": "token + 身份（warehouseCode/role/roleLabel）"}, "400": {"description": "缺 userCode/password"}, "401": {"description": "账号或密码错误"}, "403": {"description": "账号已停用"}}}},
+    "/auth/me": {"get": {"summary": "当前登录身份", "security": [{"bearerAuth": []}], "responses": {"200": {"description": "身份或 {error:未登录}"}}}},
+    "/auth/logout": {"post": {"summary": "登出吊销", "security": [{"bearerAuth": []}], "responses": {"200": {"description": "{loggedOut:bool}"}}}},
+    "/admin/token/usage/overview": {"get": {"summary": "某月每用户用量+配额+状态（管理面）", "security": [{"bearerAuth": []}], "parameters": [{"name": "month", "in": "query", "schema": {"type": "string", "example": "2026-10"}}], "responses": {"200": {"description": "按 user_id 聚合"}, "403": {"description": "需要 ADMIN/SERVICE 角色"}}}},
+    "/admin/token/usage/daily": {"get": {"summary": "某用户最近 n 天逐日用量", "security": [{"bearerAuth": []}], "parameters": [{"name": "userId", "in": "query", "schema": {"type": "string"}}, {"name": "days", "in": "query", "schema": {"type": "integer", "default": 30}}], "responses": {"200": {"description": "逐日明细"}}}},
+    "/admin/token/usage/agents": {"get": {"summary": "智能体 token 用量排行", "security": [{"bearerAuth": []}], "responses": {"200": {"description": "按 agent_code 聚合"}}}},
+    "/admin/token/usage/monthly": {"get": {"summary": "某月用量汇总（按用户+智能体）", "security": [{"bearerAuth": []}], "responses": {"200": {"description": "{month,byUser,byAgent}"}}}},
+    "/admin/token/usage/daily-agents": {"get": {"summary": "某对象某月逐日×智能体用量", "security": [{"bearerAuth": []}], "responses": {"200": {"description": "调整弹窗图表数据"}}}},
+    "/admin/token/quota/list": {"get": {"summary": "配额清单", "security": [{"bearerAuth": []}], "responses": {"200": {"description": "a_token_quota 全量"}}}},
+    "/admin/token/quota": {"post": {"summary": "新增配额", "security": [{"bearerAuth": []}], "requestBody": {"content": {"application/json": {"schema": {"type": "object", "required": ["scope", "targetCode"], "properties": {"scope": {"type": "string", "enum": ["USER", "AGENT", "TENANT"]}, "targetCode": {"type": "string"}, "monthlyTokens": {"type": "integer"}, "remark": {"type": "string"}}}}}}, "responses": {"200": {"description": "{id,saved} 或 {error}"}}}},
+    "/admin/token/quota/{id}": {"put": {"summary": "更新配额", "security": [{"bearerAuth": []}], "parameters": [{"name": "id", "in": "path", "required": true, "schema": {"type": "integer"}}], "responses": {"200": {"description": "{updated,saved}"}}}, "delete": {"summary": "删除配额", "security": [{"bearerAuth": []}], "parameters": [{"name": "id", "in": "path", "required": true, "schema": {"type": "integer"}}], "responses": {"200": {"description": "{deleted}"}}}},
+    "/admin/token/target-codes": {"get": {"summary": "配额对象候选（USER→平台账号）", "security": [{"bearerAuth": []}], "responses": {"200": {"description": "账号清单"}}}},
+    "/admin/token/feature-usage": {"get": {"summary": "功能点调用次数（月度）", "security": [{"bearerAuth": []}], "responses": {"200": {"description": "a_feature_usage"}}}},
+    "/inner/token/check": {"get": {"summary": "[内部] 配额闸门", "parameters": [{"name": "userId", "in": "query", "required": true, "schema": {"type": "string"}}], "responses": {"200": {"description": "{denied: ''|拒绝原因}"}}}},
+    "/inner/token/charge": {"post": {"summary": "[内部] 用量落账", "requestBody": {"content": {"application/json": {"schema": {"type": "object", "properties": {"userId": {"type": "string"}, "agentCode": {"type": "string"}, "model": {"type": "string"}, "totalTokens": {"type": "integer"}}}}}}, "responses": {"200": {"description": "{charged,totalTokens,modelCalls}"}}}},
+    "/inner/user/byAccessKey": {"get": {"summary": "[内部] 按 AK 查账号（含 secretKey，禁止外网暴露）", "parameters": [{"name": "accessKey", "in": "query", "required": true, "schema": {"type": "string"}}], "responses": {"200": {"description": "user 或 null"}}}},
+    "/inner/interfaceInfo/byPathMethod": {"get": {"summary": "[内部] 接口登记匹配（精确+Ant 通配）", "parameters": [{"name": "path", "in": "query", "required": true, "schema": {"type": "string"}}, {"name": "method", "in": "query", "required": true, "schema": {"type": "string"}}], "responses": {"200": {"description": "interface_info 或 null"}}}},
+    "/inner/userInterfaceInfo/invokeCount": {"post": {"summary": "[内部] 调用计数（MQ 降级通道）", "parameters": [{"name": "interfaceInfoId", "in": "query", "schema": {"type": "integer"}}, {"name": "userId", "in": "query", "schema": {"type": "integer"}}], "responses": {"200": {"description": "bool"}}}},
+    "/user/login": {"post": {"summary": "yuapi 会话登录（密码≥8位）", "responses": {"200": {"description": "BaseResponse<User> + JSESSIONID"}}}},
+    "/user/get/login": {"get": {"summary": "当前会话用户（VO 脱敏）", "responses": {"200": {"description": "UserVO 或 40100"}}}},
+    "/user/list/page": {"get": {"summary": "分页用户列表", "responses": {"200": {"description": "MP Page 形态"}}}},
+    "/interfaceInfo/list/page": {"get": {"summary": "分页接口登记", "responses": {"200": {"description": "MP Page 形态"}}}},
+    "/interfaceInfo/online": {"post": {"summary": "接口发布（经网关连通性探测）", "responses": {"200": {"description": "bool"}}}},
+    "/interfaceInfo/offline": {"post": {"summary": "接口下线", "responses": {"200": {"description": "bool"}}}},
+    "/interfaceInfo/invoke": {"post": {"summary": "测试调用（用当前用户 AK/SK 经网关）", "responses": {"200": {"description": "调用结果文本"}}}},
+    "/userInterfaceInfo/list/page": {"get": {"summary": "分页额度列表（管理员）", "responses": {"200": {"description": "MP Page 形态"}}}},
+    "/admin/digitalHuman/**": {"get": {"summary": "管理端数字员工代理（session→网关签名→内核）", "security": [{"sessionCookie": []}], "responses": {"200": {"description": "透传内核响应；未登录 200+code40100"}, "403": {"description": "非 admin"}, "502": {"description": "网关不可达"}}}}
+  },
+  "components": {
+    "securitySchemes": {
+      "bearerAuth": {"type": "http", "scheme": "bearer"},
+      "sessionCookie": {"type": "apiKey", "in": "cookie", "name": "JSESSIONID"}
+    }
+  }
+}

@@ -1,0 +1,33 @@
+{
+  "openapi": "3.0.3",
+  "info": {"title": "orchestrator（画布编排器）", "version": "1.0.0",
+    "description": "画布编排（JSON DSL → 校验 → 版本固化 → 会话粘版本执行）+ 五帧 SSE 对话 + 内置路线兜底。SSE 五帧契约：start / progress / agent_step / error / result（error 的 data 是纯字符串）。"},
+  "servers": [{"url": "/"}],
+  "paths": {
+    "/orchestrator/v1/chat/stream": {"post": {"summary": "SSE 对话（画布图或内置路线）", "security": [{"bearerAuth": []}], "parameters": [{"name": "query", "in": "query", "required": true, "schema": {"type": "string"}}], "responses": {"200": {"description": "text/event-stream 五帧：start{conversation_id} → progress{node,produced}×N → agent_step{seq,text} → result{agent_response,cards,strategy,route,graph_version?,suggestion_id?,conversation_id}；error 帧为字符串"}}}},
+    "/orchestrator/v1/conversation/list": {"get": {"summary": "会话列表（代理内核，按数字员工隔离）", "security": [{"bearerAuth": []}], "responses": {"200": {"description": "会话数组"}}}},
+    "/orchestrator/v1/replenish/preview": {"post": {"summary": "补货建议预览（确定性算法，不经 LLM）", "responses": {"200": {"description": "agent 健康检查原文"}}}},
+    "/orchestrator/v1/graph/draft": {"get": {"summary": "取当前草稿", "security": [{"bearerAuth": []}], "responses": {"200": {"description": "{dsl} 或 {dsl:null}"}}}, "put": {"summary": "保存草稿（允许带错保存，返回校验结果）", "security": [{"bearerAuth": []}], "requestBody": {"content": {"application/json": {"schema": {"$ref": "#/components/schemas/DSL"}}}}, "responses": {"200": {"description": "{saved,valid,errors?}"}}}},
+    "/orchestrator/v1/graph/publish": {"post": {"summary": "发布：校验全通过才固化为 published v{N}；body 传 dsl 或留空发布当前草稿", "security": [{"bearerAuth": []}], "requestBody": {"content": {"application/json": {"schema": {"type": "object", "properties": {"dsl": {"$ref": "#/components/schemas/DSL"}, "note": {"type": "string"}}}}}}, "responses": {"200": {"description": "{published:N} 或 {error,errors[]}"}}}},
+    "/orchestrator/v1/graph/versions": {"get": {"summary": "版本列表（draft+published 全历史）", "security": [{"bearerAuth": []}], "responses": {"200": {"description": "{versions:[{version,status,note,createdAt}]}"}}}},
+    "/orchestrator/v1/graph/rollback": {"post": {"summary": "回滚：旧版本 DSL 再发布为新版本（历史不可变）", "security": [{"bearerAuth": []}], "requestBody": {"content": {"application/json": {"schema": {"type": "object", "required": ["version"], "properties": {"version": {"type": "integer"}}}}}}, "responses": {"200": {"description": "{rolledBackTo,published}"}}}},
+    "/orchestrator/v1/graph/debug": {"post": {"summary": "草稿调试：不发布直接执行一次（body=DSL，query 参数为用户问题）", "security": [{"bearerAuth": []}], "parameters": [{"name": "query", "in": "query", "schema": {"type": "string"}}], "responses": {"200": {"description": "{answer,trace:[{node,produced}]} 或 {error,trace}"}}}},
+    "/orchestrator/v1/graph/interfaces": {"get": {"summary": "节点接口元数据（路由/护栏/类型清单）", "security": [{"bearerAuth": []}], "responses": {"200": {"description": "{routers,guards,nodeTypes}"}}}}
+  },
+  "components": {
+    "securitySchemes": {"bearerAuth": {"type": "http", "scheme": "bearer"}},
+    "schemas": {
+      "DSL": {
+        "type": "object",
+        "required": ["entry", "nodes"],
+        "properties": {
+          "entry": {"type": "string", "description": "入口节点 id"},
+          "nodes": {"type": "array", "items": {"type": "object", "required": ["id", "type"], "properties": {"id": {"type": "string"}, "type": {"type": "string", "description": "intent_router/kb/digital_human/fetch/algorithm/report/verify_numbers/critic/on_rework/on_degrade/respond/chart_plan/chart_build/order/http"}, "params": {"type": "object"}}}},
+          "edges": {"type": "array", "items": {"type": "object", "properties": {"from": {"type": "string"}, "to": {"type": "string", "description": "节点 id 或 __end__"}}}},
+          "conditional": {"type": "array", "items": {"type": "object", "properties": {"from": {"type": "string"}, "router": {"type": "string", "enum": ["route_after_supervise", "route_after_critic", "route_after_rework"]}, "map": {"type": "object", "description": "分支标签→目标节点", "additionalProperties": {"type": "string"}}}}}
+        },
+        "description": "校验规则：nodes 非空/id 唯一/entry 存在/type 白名单/边引用完整/数字红线护栏（verify_numbers、respond 不可删，report 不得直连 respond）。执行：最大步数 20，单节点访问超限判回路。"
+      }
+    }
+  }
+}

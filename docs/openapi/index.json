@@ -1,0 +1,40 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "NexusFlow-AI 接口目录（按项目名称粒度）",
+    "description": "本目录按【项目名称】聚合各服务的 OpenAPI 3.0 文档。接口页面可直接按项目名拉取对应文档接入；服务器上其他项目（如 blog）按同样粒度新增 <project>.json 即可接入本目录，无需改动页面。",
+    "version": "1.0.0"
+  },
+  "projects": {
+    "gateway": {
+      "title": "统一网关",
+      "doc": "/docs/openapi/gateway.json",
+      "description": "所有 /api/** 流量的鉴权与转发入口；业务接口请看各下游项目文档，此处只列网关自身语义（401/403 错误面）"
+    },
+    "platform-backend": {
+      "title": "平台后端",
+      "doc": "/docs/openapi/platform-backend.json",
+      "description": "门户鉴权 /api/auth/**、Token 用量分配 /api/admin/token/**、内部接口 /api/inner/**、yuapi 管理三件套、管理端代理"
+    },
+    "terminal-agent": {
+      "title": "终端业务与知识检索",
+      "doc": "/docs/openapi/terminal-agent.json",
+      "description": "终端台账 /api/terminal/**、调拨工单 /api/transferOrder/**、知识检索 /oa/chat/sync、向量库内部接口 /inner/kb/**"
+    },
+    "kernel": {
+      "title": "数字员工内核",
+      "doc": "/docs/openapi/kernel.json",
+      "description": "数字员工对话 /agent/**（同步+SSE）、管理台配置 /admin/**、工具审计"
+    },
+    "orchestrator": {
+      "title": "画布编排器",
+      "doc": "/docs/openapi/orchestrator.json",
+      "description": "五帧 SSE 对话 /orchestrator/v1/chat/stream、画布版本管理 /orchestrator/v1/graph/**"
+    }
+  },
+  "conventions": {
+    "auth": "门户/管理面：Authorization: Bearer <token>（/api/auth/login 换取，网关登记 24h）；服务间：AK/SK 签名头（accessKey/nonce/timestamp/body/sign，sign=SHA256(body+\".\"+sk)）",
+    "error": "业务错误 HTTP 200 + {code: 非0, message}；仅鉴权握手用真实状态码（400/401/403）",
+    "base": "全部经网关 :8090 对外，context-path /api"
+  }
+}

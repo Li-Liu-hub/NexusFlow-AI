@@ -1,0 +1,19 @@
+{
+  "openapi": "3.0.3",
+  "info": {"title": "gateway（统一网关）", "version": "1.0.0",
+    "description": "唯一对外入口（nginx → :8090）。业务语义见各下游项目文档；本文件只描述网关自身的通用行为：鉴权通道、签名契约、错误面。"},
+  "servers": [{"url": "/"}],
+  "paths": {
+    "/api/**": {"x-channel": "portal", "description": "门户通道：Bearer（/api/auth/login 登记 24h）。业务请求剥离客户端伪造的 X-User-*/X-Area-Code，注入网关核验的权威身份（X-User-Id/X-User-Warehouse/X-User-Role）；/oa/** 契约路径豁免。"},
+    "/oa/**,/sse,/mcp**": {"x-channel": "mcp", "description": "MCP 通道：mcp:token:<token> → ak（Redis 查表）"},
+    "/**（无 Bearer）": {"x-channel": "aksk", "description": "AK/SK 签名通道：headers accessKey/nonce(≤64)/timestamp(±300s)/body/sign=SHA256(body+.+sk)；nonce SETNX 5 分钟防重放"},
+    "/api/auth/login|logout": {"x-behavior": "匿名放行 + 响应拦截：登录成功把 {token→身份JSON} 写 Redis 24h，登出删除"}
+  },
+  "x-errors": {
+    "403": "空体（无 Bearer 的非门户路径/签名失败/nonce 重放/来源不在白名单 127.* 172.28.*）",
+    "401": "{\"error\":\"...\",\"status\":401}（门户缺令牌/未登记——前端据此跳登录页）",
+    "429": "每 ak 固定窗口限流（缺省 600/min）",
+    "502": "上游不可达"
+  },
+  "x-counting": "响应 2xx 后对 interface_info 登记的接口计数一次（直调 backend /inner/userInterfaceInfo/invokeCount）"
+}

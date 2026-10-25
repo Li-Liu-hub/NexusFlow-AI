@@ -282,7 +282,11 @@ func (e *Engine) executeLoop(ctx context.Context, asm *Assembled, t tc,
 			e.Log.Info("模型直接作答", "turn", turn, "len", full.Len())
 			break
 		}
-		e.Log.Info("模型请求工具", "turn", turn, "count", len(toolCalls), "names", func() []string { n := []string{}; for _, c := range toolCalls { n = append(n, c.Function.Name) }; return n }())
+		names := make([]string, 0, len(toolCalls))
+	for _, c := range toolCalls {
+		names = append(names, c.Function.Name)
+	}
+	e.Log.Info("模型请求工具", "turn", turn, "count", len(toolCalls), "names", names)
 		// 把 assistant 的工具调用请求与执行结果回填对话
 		assistantMsg := Message{Role: "assistant", Content: full.String(), ToolCalls: toolCalls}
 		if full.Len() == 0 {

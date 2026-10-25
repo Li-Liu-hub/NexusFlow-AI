@@ -1,0 +1,32 @@
+{
+  "openapi": "3.0.3",
+  "info": {"title": "terminal-agent（终端业务与知识检索）", "version": "1.0.0",
+    "description": "终端台账聚合、调拨工单状态机、库存健康建议（数字红线：确定性 SQL 聚合不经 LLM）、混合检索问答。可见范围：门户通道以网关注入 X-User-* 为准（本仓+下级仓）；服务方通道（AK/SK）全量语义。"},
+  "servers": [{"url": "/"}],
+  "paths": {
+    "/terminal/inventory/aggregate": {"get": {"summary": "库存聚合（仓位×物料×型号）", "parameters": [{"name": "warehouseCode", "in": "query", "schema": {"type": "string"}}, {"name": "model", "in": "query", "schema": {"type": "string"}}, {"name": "bigType", "in": "query", "schema": {"type": "string"}}], "responses": {"200": {"description": "BaseResponse<InventoryRow[]>"}}}},
+    "/terminal/inventory/byModel": {"get": {"summary": "按型号跨仓汇总", "responses": {"200": {"description": "InventoryRow[]"}}}},
+    "/terminal/inventory/aging": {"get": {"summary": "库龄分布（0-30/30-90/90-180/180-365/365+）", "parameters": [{"name": "warehouseCode", "in": "query", "schema": {"type": "string"}}], "responses": {"200": {"description": "AgingRow[]"}}}},
+    "/terminal/inventory/snapshot": {"get": {"summary": "库存快照（一次取全，算法一致视图）", "responses": {"200": {"description": "InventorySnapshotVO"}}}},
+    "/terminal/inventory/serialNos": {"get": {"summary": "某仓某物料可用串码（库龄倒序，≤500）", "parameters": [{"name": "warehouseCode", "in": "query", "required": true, "schema": {"type": "string"}}, {"name": "materialCode", "in": "query", "required": true, "schema": {"type": "string"}}, {"name": "limit", "in": "query", "schema": {"type": "integer", "default": 10}}], "responses": {"200": {"description": "string[]"}}}},
+    "/terminal/inventory/inboundTrend": {"get": {"summary": "入库量趋势（按首次入库时间归桶）", "parameters": [{"name": "granularity", "in": "query", "schema": {"type": "string", "enum": ["month", "year", "day"]}}, {"name": "from", "in": "query", "schema": {"type": "string"}}, {"name": "to", "in": "query", "schema": {"type": "string"}}, {"name": "groupBy", "in": "query", "schema": {"type": "string", "enum": ["none", "warehouse", "model"]}}], "responses": {"200": {"description": "InboundTrendVO"}}}},
+    "/terminal/inventory/monthCompare": {"get": {"summary": "指定月份入库量对比（1~24 个月）", "parameters": [{"name": "months", "in": "query", "required": true, "schema": {"type": "string", "example": "2025-06,2025-08"}}], "responses": {"200": {"description": "InboundCompareVO"}}}},
+    "/terminal/inventory/inboundSummary": {"get": {"summary": "入库量汇总（不按时间分桶）", "responses": {"200": {"description": "InboundSummaryVO"}}}},
+    "/terminal/stat/cards": {"get": {"summary": "首页统计卡片", "responses": {"200": {"description": "totalStock/longAging/昨日两项恒 null（无流水数据）"}}}},
+    "/terminal/warehouse/list": {"get": {"summary": "仓位列表（按层级）", "responses": {"200": {"description": "Warehouse[]"}}}},
+    "/terminal/health/suggest": {"get": {"summary": "库存健康检查+跨仓调拨建议（确定性，不过 LLM）", "parameters": [{"name": "warehouseCode", "in": "query", "required": true, "schema": {"type": "string"}}], "responses": {"200": {"description": "InventoryHealthVO：健康度+≤5 条建议（缺货<50 富余≥200）"}}}},
+    "/terminal/stockAlert/scan": {"post": {"summary": "库存告警巡检（查+判定，不写通知）", "responses": {"200": {"description": "ScanResult{scanned,findings[]}"}}}},
+    "/transferOrder/create": {"post": {"summary": "提交调拨申请（A仓账管；门户通道以注入身份为准）", "requestBody": {"content": {"application/json": {"schema": {"type": "object", "required": ["fromWarehouse", "toWarehouse", "items"], "properties": {"fromWarehouse": {"type": "string"}, "toWarehouse": {"type": "string"}, "operationType": {"type": "string", "enum": ["TRANSFER", "ISSUE", "RECALL", "RETURN"]}, "items": {"type": "array", "items": {"type": "object", "properties": {"materialCode": {"type": "string"}, "quantity": {"type": "integer"}}}}}}}}}, "responses": {"200": {"description": "TransferOrderVO；跨本地网需审批且单一物料"}}}},
+    "/transferOrder/outbound": {"post": {"summary": "B仓管导入SN确认出库（四重校验）", "requestBody": {"content": {"application/json": {"schema": {"type": "object", "properties": {"orderNo": {"type": "string"}, "serialNos": {"type": "array", "items": {"type": "string"}}}}}}}, "responses": {"200": {"description": "存在✓/在调出仓✓/状态✓/数量严格一致✓，任一不符 50001"}}}},
+    "/transferOrder/inbound": {"post": {"summary": "A仓管确认入库（在途→可用）", "responses": {"200": {"description": "TransferOrderVO"}}}},
+    "/transferOrder/reject": {"post": {"summary": "驳回（APPLIED=B仓管拒，OUTBOUND=A仓管驳、货退回B仓可用）", "responses": {"200": {"description": "TransferOrderVO"}}}},
+    "/transferOrder/get": {"get": {"summary": "单详情（含明细与串码；门户限相关方）", "parameters": [{"name": "orderNo", "in": "query", "required": true, "schema": {"type": "string"}}], "responses": {"200": {"description": "TransferOrderVO"}}}},
+    "/transferOrder/list/page": {"get": {"summary": "分页列表（门户只看本仓+下级仓相关）", "responses": {"200": {"description": "MP Page"}}}},
+    "/transferOrder/notice": {"post": {"summary": "站内通知写入（幂等：同 receiver+type 未读只刷新）", "responses": {"200": {"description": "{action:inserted|updated,id}"}}}},
+    "/transferOrder/notices": {"get": {"summary": "站内通知取件（门户以注入身份为准）", "responses": {"200": {"description": "Notice[]"}}}},
+    "/transferOrder/snFile": {"get": {"summary": "一键生成出库 SN 清单（只读，库龄倒序）", "parameters": [{"name": "orderNo", "in": "query", "required": true, "schema": {"type": "string"}}], "responses": {"200": {"description": "按物料分组串码清单"}}}},
+    "/oa/chat/sync": {"post": {"summary": "混合检索 RAG 问答（重写+分类→多查询→向量+2-gram关键词→RRF→Rerank→上下文增强；空上下文拒答）", "requestBody": {"content": {"application/json": {"schema": {"type": "object", "required": ["message"], "properties": {"message": {"type": "string"}, "conversationId": {"type": "string"}}}}}}, "responses": {"200": {"description": "text/plain 回答文本"}}}},
+    "/inner/kb/ingest": {"post": {"summary": "[内部] 文本入库：切分（800字/句末回看）→ embedding(bge-m3) → pgvector", "requestBody": {"content": {"application/json": {"schema": {"type": "object", "required": ["documentId", "knowledgeBaseId", "content"], "properties": {"documentId": {"type": "string"}, "knowledgeBaseId": {"type": "string"}, "sourceName": {"type": "string"}, "category": {"type": "string"}, "content": {"type": "string"}, "chunkSize": {"type": "integer"}}}}}}, "responses": {"200": {"description": "{chunkCount,embeddingModel}"}}}},
+    "/inner/kb/delete": {"post": {"summary": "[内部] 按文档清全部向量", "responses": {"200": {"description": "{deleted:true}"}}}}
+  }
+}
