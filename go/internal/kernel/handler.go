@@ -146,7 +146,11 @@ type chatRequest struct {
 func (e *Engine) runChat(c *gin.Context, agentCode string, req chatRequest) map[string]any {
 	start := time.Now()
 	asm, err := e.Registry.Get(c.Request.Context(), agentCode)
-	if err != nil || asm == nil {
+	if err != nil {
+		e.Log.Error("装配失败", "agent", agentCode, "err", err)
+		return map[string]any{"error": "数字员工装配失败: " + err.Error()}
+	}
+	if asm == nil {
 		return map[string]any{"error": "数字员工不可用（配置不存在或已停用）: " + agentCode}
 	}
 	if req.Message == "" {

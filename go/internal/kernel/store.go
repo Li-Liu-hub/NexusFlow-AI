@@ -189,7 +189,7 @@ func (s *Store) agentsBy(ctx context.Context, q string) ([]*Agent, error) {
 func (s *Store) SkillsOfAgent(ctx context.Context, agentID int64) ([]*Skill, error) {
 	rows, err := s.db.QueryContext(ctx, `
 		SELECT s.id, s.skill_code, s.skill_name, s.description, s.prompt_fragment,
-		       s.examples, s.sort_order, s.status, s.create_time, s.update_time
+		       s.examples, r.sort_order, s.status, s.create_time, s.update_time
 		FROM a_agent_skill s
 		JOIN a_agent_skill_rel r ON r.skill_id = s.id
 		WHERE r.agent_id = ? ORDER BY r.sort_order, s.id`, agentID)
@@ -607,7 +607,7 @@ func (r *Registry) Get(ctx context.Context, code string) (*Assembled, error) {
 	if err != nil {
 		return nil, err
 	}
-	if a == nil || ns2(a.Status) != "active" {
+	if a == nil || !strings.EqualFold(ns2(a.Status), "active") {
 		return nil, nil
 	}
 	skills, err := r.store.SkillsOfAgent(ctx, a.ID)

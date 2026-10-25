@@ -48,7 +48,7 @@ func (e *Engine) kernelLogin(c *gin.Context) {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "账号或密码错误"})
 		return
 	}
-	if status != "" && status != "active" {
+	if status != "" && !strings.EqualFold(status, "active") {
 		c.JSON(http.StatusForbidden, gin.H{"error": "账号已停用"})
 		return
 	}

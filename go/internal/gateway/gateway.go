@@ -91,6 +91,15 @@ func New(cfg Config, db *sql.DB, rdb *redis.Client, log *slog.Logger) *Gateway {
 	g.proxy = &httputil.ReverseProxy{
 		// SSE：立即 flush 每个 chunk（Spring 侧 writeAndFlushWith 同款语义）
 		FlushInterval: 100 * time.Millisecond,
+		// ServeHTTP 前已按路由把 out.URL 改写为目标上游；
+		// Rewrite 只负责把改写后的 In 原样带到 Out（Go 1.20+ 强制二选一）。
+		Rewrite: func(pr *httputil.ProxyRequest) {
+			pr.Out.URL.Scheme = pr.In.URL.Scheme
+			pr.Out.URL.Host = pr.In.URL.Host
+			pr.Out.URL.Path = pr.In.URL.Path
+			pr.Out.URL.RawQuery = pr.In.URL.RawQuery
+			pr.Out.Host = pr.In.Host
+		},
 		ErrorHandler: func(w http.ResponseWriter, r *http.Request, err error) {
 			log.Error("上游不可达", "target", r.URL.String(), "err", err)
 			w.WriteHeader(http.StatusBadGateway)
@@ -333,8 +342,18 @@ func (g *Gateway) resolve(path string) (base, outPath string) {
 // proxyAuth 匿名转发 /api/auth/**，登录成功把 token→身份 JSON 写 Redis（24h），登出删除。
 // 等价 CustomGlobalFilter.handlePortalAuth + updatePortalTokenMapping。
 func (g *Gateway) proxyAuth(w http.ResponseWriter, r *http.Request, isLogout bool) {
+	// 与主路径同款 URL 改写（/api/auth/** → backend，不剥前缀）
+	target, stripped := g.resolve(r.URL.Path)
+	u, _ := url.Parse(target + stripped)
+	out := r.Clone(r.Context())
+	out.URL.Scheme = u.Scheme
+	out.URL.Host = u.Host
+	out.URL.Path = u.Path
+	out.URL.RawQuery = r.URL.RawQuery
+	out.Host = u.Host
+
 	rec := &bodyRecorder{ResponseWriter: w}
-	g.serveProxy(rec, r)
+	g.serveProxy(rec, out)
 	if rec.status != http.StatusOK || len(rec.body) == 0 {
 		return
 	}
