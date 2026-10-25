@@ -30,6 +30,11 @@
       "title": "画布编排器",
       "doc": "/docs/openapi/orchestrator.json",
       "description": "五帧 SSE 对话 /orchestrator/v1/chat/stream、画布版本管理 /orchestrator/v1/graph/**"
+    },
+    "bizsuite": {
+      "title": "业务套件",
+      "doc": "/docs/openapi/bizsuite.json",
+      "description": "合同信智能抽取（9 态状态机 100 条/批）/api/contract/**、AI 辅助工单建单（7 类分类 requestId 防重）/api/ticket/**"
     }
   },
   "conventions": {
