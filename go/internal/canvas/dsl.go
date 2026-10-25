@@ -90,7 +90,7 @@ func Validate(dsl *DSL, registry *Registry) []string {
 			errs = append(errs, fmt.Sprintf("条件路由「%s」的 router「%s」不在注册表", cnd.From, cnd.Router))
 		}
 		for label, target := range cnd.Map {
-			if !ids[target] {
+			if target != "__end__" && !ids[target] {
 				errs = append(errs, fmt.Sprintf("条件路由「%s」分支 %s 指向不存在的节点「%s」", cnd.From, label, target))
 			}
 		}

@@ -145,12 +145,12 @@ func SplitChunks(content string, maxLen int) []string {
 			continue
 		}
 		pl := len([]rune(p))
-		if buf.Len() > 0 && buf.Len()+pl+2 > maxLen {
+		if bufRuneLen(&buf) > 0 && bufRuneLen(&buf)+pl+2 > maxLen {
 			chunks = append(chunks, buf.String())
 			buf.Reset()
 		}
 		if pl > maxLen {
-			if buf.Len() > 0 {
+			if bufRuneLen(&buf) > 0 {
 				chunks = append(chunks, buf.String())
 				buf.Reset()
 			}
@@ -162,10 +162,16 @@ func SplitChunks(content string, maxLen int) []string {
 		}
 		buf.WriteString(p)
 	}
-	if buf.Len() > 0 {
+	if bufRuneLen(&buf) > 0 {
 		chunks = append(chunks, buf.String())
 	}
 	return chunks
+}
+
+// bufRuneLen 按字符数计缓冲长度（与 HardSplit 的 rune 口径一致；
+// 字节数会把中文分片切成 maxLen/3）。
+func bufRuneLen(b *strings.Builder) int {
+	return len([]rune(b.String()))
 }
 
 // HardSplit 超长段落硬切：在句末标点处回看（窗口 120 字符）尽量不断句。

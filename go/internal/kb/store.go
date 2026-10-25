@@ -58,6 +58,11 @@ func (s *SiliconFlow) Embed(ctx context.Context, model string, texts []string) (
 			vecs[d.Index] = d.Embedding
 		}
 	}
+	for i, v := range vecs {
+		if len(v) == 0 {
+			return nil, fmt.Errorf("embedding 返回缺条: index %d", i)
+		}
+	}
 	return vecs, nil
 }
 
@@ -245,7 +250,7 @@ func (s *PgStore) InsertChunks(ctx context.Context, chunks []Chunk, vectors [][]
 			vecJSON, _ := json.Marshal(vectors[i])
 			metaJSON, _ := json.Marshal(chunks[i].Metadata)
 			if _, err := tx.ExecContext(ctx,
-				`INSERT INTO vector_store (id, content, metadata, embedding) VALUES (?, ?, ?::jsonb, ?::vector)`,
+				`INSERT INTO vector_store (id, content, metadata, embedding) VALUES ($1, $2, $3::jsonb, $4::vector)`,
 				uuid.NewString(), chunks[i].Content, string(metaJSON), string(vecJSON)); err != nil {
 				tx.Rollback()
 				return written, err
@@ -259,7 +264,9 @@ func (s *PgStore) InsertChunks(ctx context.Context, chunks []Chunk, vectors [][]
 	return written, nil
 }
 
-// AllContents 关键词通道的语料捞取（上限 500，Java 同款）：id + content + category。
+// AllContents 关键词通道的语料捞取（上限 500，Java 同款）：id + content + metadata。
+// metadata 一并返回，让关键词路与向量路用同一个去重 key（document_id:chunk_index），
+// 否则 RRF 会把同一片段当两条计分。
 func (s *PgStore) AllContents(ctx context.Context, categories []string) ([]Hit, error) {
 	query := `SELECT id::text, COALESCE(content,''), metadata FROM vector_store WHERE content IS NOT NULL`
 	var args []any

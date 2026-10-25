@@ -15,6 +15,7 @@ package gateway
 
 import (
 	"context"
+	"crypto/subtle"
 	"database/sql"
 	"encoding/json"
 	"fmt"
@@ -70,8 +71,8 @@ type invokeUser struct {
 
 // interfaceInfo 对齐 `interface_info` 表（gateway 只用 id/status）。
 type interfaceInfo struct {
-	ID     int64 `json:"id"`
-	Status int   `json:"status"`
+	ID     *int64 `json:"id"`
+	Status *int   `json:"status"`
 }
 
 // Gateway 承载全部路由与过滤逻辑。
@@ -226,7 +227,7 @@ func (g *Gateway) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		ts, err := strconv.ParseInt(timestamp, 10, 64)
-		if err != nil || time.Now().Unix()-ts >= 300 {
+		if err != nil || abs64(time.Now().Unix()-ts) >= 300 {
 			g.noAuth(w)
 			return
 		}
@@ -235,7 +236,7 @@ func (g *Gateway) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		if payload == "" {
 			payload = "null"
 		}
-		if sign == "" || sign != httpkit.Sign(payload, user.SecretKey) {
+		if sign == "" || subtle.ConstantTimeCompare([]byte(sign), []byte(httpkit.Sign(payload, user.SecretKey))) != 1 {
 			g.noAuth(w)
 			return
 		}
@@ -244,6 +245,11 @@ func (g *Gateway) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	// 5. 接口登记校验（Redis 30min 缓存 → MySQL，精确 + Ant 通配）
 	info, err := g.findInterface(r.Context(), path, method)
 	if err != nil || info == nil {
+		g.noAuth(w)
+		return
+	}
+	// 已下线/停用的登记不再放行（Java 版漏校验，Go 版补上）
+	if info.Status != nil && *info.Status != 1 {
 		g.noAuth(w)
 		return
 	}
@@ -415,14 +421,14 @@ func (g *Gateway) findInterface(ctx context.Context, path, method string) (*inte
 	key := "interface:" + path + ":" + method
 	if cached, err := g.rdb.Get(ctx, key).Result(); err == nil && cached != "" {
 		var i interfaceInfo
-		if json.Unmarshal([]byte(cached), &i) == nil && i.ID > 0 {
+		if json.Unmarshal([]byte(cached), &i) == nil && i.ID != nil && *i.ID > 0 {
 			return &i, nil
 		}
 	}
 	// 精确优先
 	var i interfaceInfo
 	err := g.db.QueryRowContext(ctx,
-		`SELECT id, IFNULL(status,0) FROM interface_info WHERE url = ? AND method = ? AND isDelete = 0`,
+		`SELECT id, status FROM interface_info WHERE url = ? AND method = ? AND isDelete = 0`,
 		path, method).Scan(&i.ID, &i.Status)
 	if err == sql.ErrNoRows {
 		// 通配兜底：登记含 * 的同 method 行逐条 Ant 匹配（复用 innerapi 的匹配器）
@@ -503,6 +509,13 @@ func (g *Gateway) unauthorized(w http.ResponseWriter, message string) {
 }
 
 // ---- 小工具 ----
+
+func abs64(v int64) int64 {
+	if v < 0 {
+		return -v
+	}
+	return v
+}
 
 // statusRecorder 记录状态码并在写头后触发回调（计量一次）。
 type statusRecorder struct {

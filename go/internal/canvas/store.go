@@ -30,7 +30,7 @@ func (s *Store) EnsureSchema(ctx context.Context) error {
 		   status varchar(16) NOT NULL,
 		   dsl jsonb NOT NULL,
 		   note varchar(200),
-		   created_at timestamptz NOT NULL DEFAULT now()`,
+		   created_at timestamptz NOT NULL DEFAULT now())`,
 		`CREATE UNIQUE INDEX IF NOT EXISTS idx_orch_graph_version ON orch_graph(version)`,
 		`CREATE TABLE IF NOT EXISTS orch_conversation (
 		   id varchar(40) PRIMARY KEY,
@@ -38,9 +38,9 @@ func (s *Store) EnsureSchema(ctx context.Context) error {
 		   warehouse_code varchar(32),
 		   title varchar(100),
 		   graph_version int,
-		   created_at timestamptz NOT NULL DEFAULT now()`,
+		   created_at timestamptz NOT NULL DEFAULT now())`,
 	} {
-		if _, err := s.db.ExecContext(ctx, ddl+")"); err != nil {
+		if _, err := s.db.ExecContext(ctx, ddl); err != nil {
 			return err
 		}
 	}
@@ -88,12 +88,24 @@ func (s *Store) Publish(ctx context.Context, dslJSON []byte, note string) (int, 
 		return 0, err
 	}
 	v := maxV + 1
-	// 草稿槽一并消费（发布后画布无草稿）
-	s.db.ExecContext(ctx, `DELETE FROM orch_graph WHERE status='draft'`)
-	_, err := s.db.ExecContext(ctx,
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return 0, err
+	}
+	defer tx.Rollback()
+	// 草稿槽一并消费（发布后画布无草稿）；与版本插入同事务，失败不丢草稿
+	if _, err := tx.ExecContext(ctx, `DELETE FROM orch_graph WHERE status='draft'`); err != nil {
+		return 0, err
+	}
+	if _, err := tx.ExecContext(ctx,
 		`INSERT INTO orch_graph (version, status, dsl, note) VALUES ($1,'published',$2::jsonb,$3)`,
-		v, string(dslJSON), note)
-	return v, err
+		v, string(dslJSON), note); err != nil {
+		return 0, err
+	}
+	if err := tx.Commit(); err != nil {
+		return 0, err
+	}
+	return v, nil
 }
 
 // LoadPublished 最新 published 版本（无则 nil, 0）。
@@ -122,7 +134,7 @@ func (s *Store) LoadVersion(ctx context.Context, version int) ([]byte, error) {
 // Versions 版本列表。
 func (s *Store) Versions(ctx context.Context) ([]map[string]any, error) {
 	rows, err := s.db.QueryContext(ctx, `
-		SELECT version, status, IFNULL(NULLIF(note,''),NULL) AS note, created_at::text AS created_at FROM orch_graph ORDER BY version DESC`)
+		SELECT version, status, note, created_at::text AS created_at FROM orch_graph ORDER BY version DESC`)
 	if err != nil {
 		return nil, err
 	}

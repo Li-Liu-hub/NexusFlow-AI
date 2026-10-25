@@ -84,6 +84,9 @@ type sseWriter struct {
 }
 
 func (s *sseWriter) send(event, data string) {
+	if s == nil || s.c == nil || s.c.Writer == nil {
+		return // 画布节点复用路线函数时无 SSE 上下文，静默跳过
+	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	fmt.Fprintf(s.c.Writer, "event: %s\ndata: %s\n\n", event, strings.ReplaceAll(data, "\n", "\ndata: "))

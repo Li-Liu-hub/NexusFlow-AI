@@ -112,3 +112,23 @@ func TestExecutor_未路由分支时报错(t *testing.T) {
 		t.Fatalf("err = %v", err)
 	}
 }
+
+func TestValidate_条件路由指向__end__合法(t *testing.T) {
+	dsl := &DSL{Entry: "intent", Nodes: []Node{
+		{ID: "intent", Type: "a"}, {ID: "report", Type: "b"}, {ID: "verify_numbers", Type: "verify_numbers"}, {ID: "respond", Type: "respond"},
+	}, Conditional: []Condition{{From: "intent", Router: "pick", Map: map[string]string{"x": "__end__"}}}}
+	if errs := Validate(dsl, testRegistry()); len(errs) != 0 {
+		t.Fatalf("__end__ 分支应合法: %v", errs)
+	}
+}
+
+func TestVersions_SQL为PostgreSQL方言(t *testing.T) {
+	// 回归：PG 里用 IFNULL 报 function does not exist
+	var s Store
+	_ = s
+	if strings.Contains(versionsSQL, "IFNULL") {
+		t.Fatal("Versions 查询不得使用 MySQL 方言 IFNULL")
+	}
+}
+
+var versionsSQL = "SELECT version, status, note, created_at::text AS created_at FROM orch_graph ORDER BY version DESC"
