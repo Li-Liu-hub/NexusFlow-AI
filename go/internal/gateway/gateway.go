@@ -36,6 +36,7 @@ import (
 // Config 是网关的全部可调参数（对齐 application.yml + compose 环境变量）。
 type Config struct {
 	Addr     string
+	BizURL   string // bizsuite :8130（合同抽取 + 工单建单）
 	MySQLDSN string
 	Redis    struct {
 		Addr     string
@@ -122,6 +123,7 @@ func (g *Gateway) routes() []route {
 	return []route{
 		{[]string{"/api/terminal/", "/api/transferOrder/"}, g.cfg.AgentURL, 1},   // → /terminal/** /transferOrder/**
 		{[]string{"/api/orchestrator/"}, g.cfg.OrchURL, 1},                      // → /orchestrator/**
+		{[]string{"/api/contract/", "/api/ticket/"}, g.cfg.BizURL, 1},           // → /contract/** /ticket/**
 		{[]string{"/api/auth/", "/api/admin/token/"}, g.cfg.BackendURL, 0},      // backend 带 context-path
 		{[]string{"/api/agent/", "/api/admin/"}, g.cfg.KernelURL, 1},            // → /agent/** /admin/**
 		{[]string{"/digitalHuman/"}, g.cfg.KernelURL, 1},                        // → /agent/** 等

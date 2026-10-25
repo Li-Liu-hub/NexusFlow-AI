@@ -87,6 +87,7 @@ func LoadGateway() (GatewayConfig, error) {
 		AgentURL:        getenv("AGENT_URL", "http://127.0.0.1:8127"),
 		KernelURL:       getenv("KERNEL_URL", "http://127.0.0.1:8126"),
 		OrchURL:         getenv("ORCHESTRATOR_URL", "http://127.0.0.1:8125"),
+		BizURL:          getenv("BIZ_URL", "http://127.0.0.1:8130"),
 		MockURL:         getenv("MOCK_URL", "http://127.0.0.1:8123"),
 		PortalAccessKey: getenv("PORTAL_ACCESS_KEY", "aismp-console"),
 		RatePerMinute:   getenvInt("RATE_PER_MINUTE", 600),
